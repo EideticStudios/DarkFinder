@@ -1,0 +1,46 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 48px;
+  background: rgba(10, 10, 15, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #e0e0e0;
+}
+
+.githubLink {
+  font-size: 13px;
+  color: #9ca3af;
+  text-decoration: none;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.githubLink:hover {
+  color: #e0e0e0;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mapWrapper {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
