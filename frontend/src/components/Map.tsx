@@ -4,16 +4,27 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import styles from './Map.module.css'
 
 const CARTO_DARK_TILES = ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png']
+const API_BASE = 'http://localhost:8000/api/v1'
 
-// GIBS WMTS uses {TileMatrix}/{TileRow}/{TileCol} — MapLibre substitutes {z}/{y}/{x} correctly
-const GIBS_VIIRS_TILES = [
-  'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png',
-]
+function tileUrl(year: number): string {
+  return `${API_BASE}/tiles/${year}/{z}/{x}/{y}.png`
+}
 
-export default function Map() {
+interface MapProps {
+  year: number
+}
+
+export default function Map({ year }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  const yearRef = useRef(year)
 
+  // Keep yearRef current so the click handler always reads the latest year
+  useEffect(() => {
+    yearRef.current = year
+  }, [year])
+
+  // Initialize map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
@@ -26,29 +37,24 @@ export default function Map() {
             type: 'raster',
             tiles: CARTO_DARK_TILES,
             tileSize: 256,
-            attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            attribution:
+              '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
           },
-          'viirs': {
+          viirs: {
             type: 'raster',
-            tiles: GIBS_VIIRS_TILES,
+            tiles: [tileUrl(year)],
             tileSize: 256,
             maxzoom: 8,
-            attribution: 'NASA Black Marble VIIRS &copy; NASA',
+            attribution: 'NASA Black Marble VIIRS &copy; NASA / EOG',
           },
         },
         layers: [
-          {
-            id: 'carto-dark',
-            type: 'raster',
-            source: 'carto-dark',
-          },
+          { id: 'carto-dark', type: 'raster', source: 'carto-dark' },
           {
             id: 'viirs-overlay',
             type: 'raster',
             source: 'viirs',
-            paint: {
-              'raster-opacity': 0.6,
-            },
+            paint: { 'raster-opacity': 0.85 },
           },
         ],
       },
@@ -58,23 +64,30 @@ export default function Map() {
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
 
-    map.on('error', (e) => console.error('[MapLibre error]', e.error))
-    map.on('load', () => {
-      console.log('[MapLibre] style loaded, sources:', Object.keys(map.getStyle().sources))
-    })
-
     const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: false })
 
-    map.on('click', (e) => {
+    map.on('click', async (e) => {
       const { lat, lng } = e.lngLat
-      popup
-        .setLngLat(e.lngLat)
-        .setHTML(
-          `<strong>Coordinates</strong><br/>` +
-          `Lat: ${lat.toFixed(5)}<br/>` +
-          `Lng: ${lng.toFixed(5)}`
+      const currentYear = yearRef.current
+
+      let html = `<strong>${lat.toFixed(4)}°, ${lng.toFixed(4)}°</strong><br/>`
+
+      try {
+        const resp = await fetch(
+          `${API_BASE}/radiance?lat=${lat}&lng=${lng}&year=${currentYear}`
         )
-        .addTo(map)
+        if (resp.ok) {
+          const data = await resp.json()
+          html +=
+            `Bortle class: <strong>${data.bortle}</strong><br/>` +
+            `SQM: ${data.sqm} mag/arcsec²<br/>` +
+            `Radiance: ${data.radiance} nW/cm²/sr`
+        }
+      } catch {
+        // backend not available — show coords only
+      }
+
+      popup.setLngLat(e.lngLat).setHTML(html).addTo(map)
     })
 
     mapRef.current = map
@@ -83,7 +96,16 @@ export default function Map() {
       map.remove()
       mapRef.current = null
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Swap tile source when year changes
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+
+    const source = map.getSource('viirs') as maplibregl.RasterTileSource | undefined
+    source?.setTiles([tileUrl(year)])
+  }, [year])
 
   return <div ref={containerRef} className={styles.container} />
 }
