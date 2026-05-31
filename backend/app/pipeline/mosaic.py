@@ -71,7 +71,10 @@ def find_source_files(year: int) -> tuple[list[Path], str]:
         return tifs, "tif"
 
     # GeoTIFFs extracted by download.py from LPDAAC granules
-    vnp_tifs = sorted(raw_dir.glob("VNP46A4.*.tif"))
+    # Filter by year so 2022 tiles in the same directory don't pollute 2023 output
+    vnp_tifs = sorted(
+        p for p in raw_dir.glob("VNP46A4.*.tif") if f"A{year}" in p.name
+    )
     if vnp_tifs:
         return vnp_tifs, "tif"
 
@@ -237,6 +240,51 @@ def stream_mosaic(tif_paths: list[Path], out_path: Path) -> None:
     click.echo()  # newline after progress line
 
 
+# ── Sinusoidal → WGS84 reprojection ───────────────────────────────────────────
+
+def warp_to_wgs84(src_path: Path, dst_path: Path) -> None:
+    """
+    Reproject a sinusoidal GeoTIFF to EPSG:4326.
+
+    Uses file handles so rasterio/GDAL reads the CRS from the embedded file
+    metadata rather than parsing a PROJ4 string we specify in code.  This is
+    reliable for MODIS sinusoidal whereas passing a PROJ4 string to the
+    in-memory reproject API was silently producing all-nodata output.
+    """
+    from rasterio.warp import calculate_default_transform, reproject, Resampling
+
+    with rasterio.open(src_path) as src:
+        transform, width, height = calculate_default_transform(
+            src.crs, "EPSG:4326", src.width, src.height, *src.bounds
+        )
+        profile = src.profile.copy()
+        profile.update({
+            "crs": "EPSG:4326",
+            "transform": transform,
+            "width": width,
+            "height": height,
+            "compress": "deflate",
+            "predictor": 3,
+            "tiled": True,
+            "blockxsize": 512,
+            "blockysize": 512,
+        })
+        # Remove bigtiff / other driver-specific keys that may not transfer
+        profile.pop("bigtiff", None)
+
+        with rasterio.open(dst_path, "w", **profile) as dst:
+            reproject(
+                source=rasterio.band(src, 1),
+                destination=rasterio.band(dst, 1),
+                src_crs=src.crs,
+                dst_crs="EPSG:4326",
+                dst_transform=transform,
+                resampling=Resampling.bilinear,
+                src_nodata=H5_NODATA,
+                dst_nodata=H5_NODATA,
+            )
+
+
 # ── EOG multi-tile mosaic (original, in-memory — safe for ≤ a few files) ──────
 
 def mosaic_tiles(tifs: list[Path], tmp_path: Path) -> None:
@@ -370,6 +418,27 @@ def main(year: int, skip_validate: bool) -> None:
             need_cleanup = True
             stream_mosaic(sources, work_path)
             click.echo(f"  Mosaic complete → {work_path}")
+
+    # ── Warp sinusoidal mosaic → WGS84 ────────────────────────────────────────
+    click.echo("\nWarping sinusoidal mosaic → EPSG:4326 (gdalwarp)...")
+    wgs84_tmp = tempfile.NamedTemporaryFile(suffix="_wgs84.tif", delete=False)
+    wgs84_tmp.close()
+    wgs84_path = Path(wgs84_tmp.name)
+    try:
+        warp_to_wgs84(work_path, wgs84_path)
+        size_gb = wgs84_path.stat().st_size / 1e9
+        click.echo(f"  Warp complete: {size_gb:.2f} GB")
+    except Exception as exc:
+        click.echo(f"Error during warp: {exc}", err=True)
+        if need_cleanup:
+            work_path.unlink(missing_ok=True)
+        wgs84_path.unlink(missing_ok=True)
+        sys.exit(1)
+
+    if need_cleanup:
+        work_path.unlink(missing_ok=True)
+    work_path = wgs84_path
+    need_cleanup = True
 
     # ── Build overviews ────────────────────────────────────────────────────────
     click.echo("\nBuilding overviews (may take several minutes on large files)...")
