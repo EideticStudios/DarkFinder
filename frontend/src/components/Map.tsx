@@ -109,10 +109,19 @@ export default function Map({ year, hasData }: MapProps) {
   // Swap tile source when year or data availability changes
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
+    if (!map) return
 
-    const source = map.getSource('viirs') as maplibregl.RasterTileSource | undefined
-    source?.setTiles(hasData ? [tileUrl(year)] : GIBS_TILES)
+    const applyTiles = () => {
+      const source = map.getSource('viirs') as maplibregl.RasterTileSource | undefined
+      source?.setTiles(hasData ? [tileUrl(year)] : GIBS_TILES)
+    }
+
+    if (map.isStyleLoaded()) {
+      applyTiles()
+    } else {
+      map.once('load', applyTiles)
+      return () => { map.off('load', applyTiles) }
+    }
   }, [year, hasData])
 
   return <div ref={containerRef} className={styles.container} />

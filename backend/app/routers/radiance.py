@@ -43,8 +43,10 @@ def get_radiance(lat: float, lng: float, year: int) -> RadianceResponse:
         raise HTTPException(status_code=422, detail="lat/lng out of range")
 
     try:
+        from rasterio.warp import transform as rio_transform
         with rasterio.open(cog_path) as ds:
-            samples = list(ds.sample([(lng, lat)]))
+            xs, ys = rio_transform("EPSG:4326", ds.crs, [lng], [lat])
+            samples = list(ds.sample([(xs[0], ys[0])]))
             raw = float(samples[0][0])
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to sample raster: {exc}") from exc
