@@ -1,7 +1,7 @@
 .PHONY: dev-frontend dev-backend install lint typecheck \
         download process pipeline
 
-PYTHON := backend/.venv/bin/python
+PYTHON := .venv/bin/python
 YEAR   ?= 2023
 
 # ── Dev ────────────────────────────────────────────────────────────────────────
@@ -30,11 +30,14 @@ typecheck:
 # ── Data pipeline ─────────────────────────────────────────────────────────────
 # Usage:
 #   make download YEAR=2023
+#   make download YEAR=2023 BBOX="-130,24,-60,50"   # North America only
 #   make process  YEAR=2023
 #   make pipeline YEAR=2023   (download + process)
 
+BBOX ?=
+
 download:
-	cd backend && $(PYTHON) -m app.pipeline.download --year $(YEAR)
+	cd backend && $(PYTHON) -m app.pipeline.download --year $(YEAR) $(if $(BBOX),--bbox "$(BBOX)",)
 
 process:
 	cd backend && $(PYTHON) -m app.pipeline.mosaic --year $(YEAR)

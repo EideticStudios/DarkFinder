@@ -70,13 +70,19 @@ def find_source_files(year: int) -> tuple[list[Path], str]:
     if tifs:
         return tifs, "tif"
 
+    # GeoTIFFs extracted by download.py from LPDAAC granules
+    vnp_tifs = sorted(raw_dir.glob("VNP46A4.*.tif"))
+    if vnp_tifs:
+        return vnp_tifs, "tif"
+
+    # Fallback: raw HDF5 files (old download approach)
     h5s = sorted(raw_dir.glob("VNP46A4.*.h5"))
     if h5s:
         return h5s, "h5"
 
     raise FileNotFoundError(
         f"No source files found in {raw_dir}.\n"
-        "Expected VNP46A4.*.h5 (NASA LPDAAC) or *.average_masked.tif (EOG)."
+        "Expected VNP46A4.*.tif (run download first) or *.average_masked.tif (EOG)."
     )
 
 
