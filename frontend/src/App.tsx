@@ -40,7 +40,7 @@ export default function App() {
         </a>
       </header>
       <div className="mapWrapper">
-        <Map year={year} />
+        <Map year={year} hasData={availableYears.length > 0} />
         <BortleLegend />
       </div>
     </div>
