@@ -285,9 +285,9 @@ def convert_to_cog(src_path: Path, out_path: Path) -> None:
     profile.update({"predictor": 3})
 
     cog_translate(
-        input=str(src_path),
-        output=str(out_path),
-        profile=profile,
+        str(src_path),
+        str(out_path),
+        profile,
         overview_resampling="bilinear",
         config={
             "GDAL_TIFF_INTERNAL_MASK": True,
@@ -368,8 +368,8 @@ def main(year: int, skip_validate: bool) -> None:
             tmp_file.close()
             work_path = Path(tmp_file.name)
             need_cleanup = True
-            mosaic_tiles(sources, work_path)
-            click.echo(f"  Merged → {work_path}")
+            stream_mosaic(sources, work_path)
+            click.echo(f"  Mosaic complete → {work_path}")
 
     # ── Build overviews ────────────────────────────────────────────────────────
     click.echo("\nBuilding overviews (may take several minutes on large files)...")

@@ -64,8 +64,10 @@ export default function Map({ year, hasData }: MapProps) {
           },
         ],
       },
-      center: [0, 20],
-      zoom: 2,
+      center: [-95, 38],
+      zoom: 3,
+      minZoom: 3,
+      maxBounds: [[-175, 5], [-40, 75]],
     })
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
