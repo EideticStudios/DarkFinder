@@ -45,3 +45,6 @@ process:
 	cd backend && $(PYTHON) -m app.pipeline.mosaic --year $(YEAR)
 
 pipeline: download process
+
+validate:
+	cd backend && $(PYTHON) -m app.pipeline.validate --year $(YEAR)
