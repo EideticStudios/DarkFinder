@@ -1,5 +1,5 @@
 .PHONY: dev-frontend dev-backend install lint typecheck \
-        download download-nasa process pipeline
+        download download-nasa download-gee process pipeline pipeline-gee
 
 PYTHON := .venv/bin/python
 YEAR   ?= 2023
@@ -44,10 +44,15 @@ download:
 download-nasa:
 	cd backend && $(PYTHON) -m app.pipeline.download_nasa --year $(YEAR) $(if $(BBOX),--bbox "$(BBOX)",)
 
+download-gee:
+	cd backend && $(PYTHON) -m app.pipeline.download_gee --year $(YEAR) $(if $(BBOX),--bbox "$(BBOX)",)
+
 process:
 	cd backend && $(PYTHON) -m app.pipeline.mosaic --year $(YEAR)
 
 pipeline: download process
+
+pipeline-gee: download-gee process
 
 validate:
 	cd backend && $(PYTHON) -m app.pipeline.validate --year $(YEAR)

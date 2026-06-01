@@ -11,3 +11,5 @@ Pillow>=10.0.0
 earthaccess>=0.9.0
 h5py>=3.10.0
 rich>=13.0.0
+earthengine-api>=0.1.390
+geemap>=0.33.0
