@@ -49,7 +49,7 @@ DATA_DIR = Path(__file__).parent.parent.parent / "data"
 ENV_FILE = Path(__file__).parent.parent.parent / ".env"
 
 PRODUCT_SHORT_NAME = "VNP46A4"
-PRODUCT_VERSION = "2"
+PRODUCT_VERSION = "1"
 
 # HDF5 dataset containing annual average radiance (nW/cm²/sr)
 H5_DATASET_PATH = (
