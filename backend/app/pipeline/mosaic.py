@@ -64,9 +64,9 @@ def find_source_files(year: int) -> tuple[list[Path], str]:
             f"Run download first:  python -m app.pipeline.download --year {year}"
         )
 
-    tifs = sorted(raw_dir.glob("*.average_masked.tif"))
+    tifs = sorted(raw_dir.glob("*average_masked*.tif"))
     if not tifs:
-        tifs = sorted(raw_dir.glob("*.average.tif"))
+        tifs = sorted(raw_dir.glob("*average*.tif"))
     if tifs:
         return tifs, "tif"
 

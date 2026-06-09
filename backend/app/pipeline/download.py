@@ -158,9 +158,9 @@ def main(year: int, username: str | None, password: str | None, url: str | None)
             sys.exit(1)
         console.print(f"  Found: {gz_filename}")
 
-    # Output: strip .dat.tif.gz → .tif  (e.g. *.average_masked.tif)
-    # mosaic.py looks for *.average_masked.tif
-    tif_name = gz_filename.replace(".dat.tif.gz", ".tif")
+    # Output: strip .gz only, keeping the original .dat.tif extension
+    # mosaic.py globs for *average_masked*.tif which matches .dat.tif
+    tif_name = gz_filename.removesuffix(".gz")
     tif_path = out_dir / tif_name
     gz_path = out_dir / gz_filename
 
