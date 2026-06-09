@@ -30,7 +30,7 @@ def apply_bortle_colormap(band: np.ndarray, valid_mask: np.ndarray) -> np.ndarra
 
     Args:
         band:       (H, W) float32 radiance values in nW/cm²/sr
-        valid_mask: (H, W) uint8 mask — 255 = valid pixel, 0 = nodata
+        valid_mask: (H, W) bool — True = valid pixel, False = nodata
 
     Returns:
         (H, W, 4) uint8 RGBA array
@@ -61,7 +61,7 @@ def apply_bortle_colormap(band: np.ndarray, valid_mask: np.ndarray) -> np.ndarra
         rgba[top_mask] = (r, g, b, a)
 
     # Transparent where nodata or zero radiance
-    no_light = (band <= 0) | np.isnan(band) | (valid_mask == 0)
+    no_light = (band <= 0) | np.isnan(band) | ~valid_mask
     rgba[no_light, 3] = 0
 
     return rgba
@@ -85,7 +85,11 @@ def render_tile(cog_path: str, z: int, x: int, y: int) -> bytes | None:
         return None
 
     band = img.data[0].astype(np.float32)           # (H, W)
-    valid_mask = img.mask if img.mask.ndim == 2 else img.mask[0]  # (H, W)
+
+    # Build a boolean valid-pixel mask. rio-tiler uses 0 for invalid pixels
+    # regardless of mask dtype (uint8 255=valid or float32 FLT_MAX=valid).
+    raw_mask = img.mask if img.mask.ndim == 2 else img.mask[0]
+    valid_mask = raw_mask != 0
 
     rgba = apply_bortle_colormap(band, valid_mask)   # (H, W, 4)
 

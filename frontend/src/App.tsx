@@ -10,6 +10,7 @@ const DEFAULT_YEAR = 2023
 export default function App() {
   const [year, setYear] = useState<number>(DEFAULT_YEAR)
   const [availableYears, setAvailableYears] = useState<number[]>([])
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     fetch(`${API_BASE}/years`)
@@ -21,8 +22,9 @@ export default function App() {
         }
       })
       .catch(() => {
-        // Backend not running — year selector stays hidden
+        // Backend not running — will fall back to GIBS tiles
       })
+      .finally(() => setReady(true))
   }, [])
 
   return (
@@ -40,7 +42,7 @@ export default function App() {
         </a>
       </header>
       <div className="mapWrapper">
-        <Map year={year} hasData={availableYears.length > 0} />
+        {ready && <Map year={year} hasData={availableYears.length > 0} />}
         <BortleLegend />
       </div>
     </div>

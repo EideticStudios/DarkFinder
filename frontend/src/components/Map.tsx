@@ -11,8 +11,10 @@ const GIBS_TILES = [
   'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png',
 ]
 
+const TILE_VERSION = 2
+
 function tileUrl(year: number): string {
-  return `${API_BASE}/tiles/${year}/{z}/{x}/{y}.png`
+  return `${API_BASE}/tiles/${year}/{z}/{x}/{y}.png?v=${TILE_VERSION}`
 }
 
 interface MapProps {
@@ -23,14 +25,8 @@ interface MapProps {
 export default function Map({ year, hasData }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
-  const yearRef = useRef(year)
-  const hasDataRef = useRef(hasData)
 
-  // Keep refs current
-  useEffect(() => { yearRef.current = year }, [year])
-  useEffect(() => { hasDataRef.current = hasData }, [hasData])
-
-  // Initialize map once
+  // Initialize map once — hasData is already resolved before this mounts
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
@@ -76,13 +72,12 @@ export default function Map({ year, hasData }: MapProps) {
 
     map.on('click', async (e) => {
       const { lat, lng } = e.lngLat
-      const currentYear = yearRef.current
 
       let html = `<strong>${lat.toFixed(4)}°, ${lng.toFixed(4)}°</strong><br/>`
 
       try {
         const resp = await fetch(
-          `${API_BASE}/radiance?lat=${lat}&lng=${lng}&year=${currentYear}`
+          `${API_BASE}/radiance?lat=${lat}&lng=${lng}&year=${year}`
         )
         if (resp.ok) {
           const data = await resp.json()
@@ -106,21 +101,24 @@ export default function Map({ year, hasData }: MapProps) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Swap tile source when year or data availability changes
+  // Update tile source when year changes
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    const applyTiles = () => {
+    const updateSource = () => {
       const source = map.getSource('viirs') as maplibregl.RasterTileSource | undefined
-      source?.setTiles(hasData ? [tileUrl(year)] : GIBS_TILES)
+      if (!source) return
+
+      const newTiles = hasData ? [tileUrl(year)] : GIBS_TILES
+      source.setTiles(newTiles)
     }
 
     if (map.isStyleLoaded()) {
-      applyTiles()
+      updateSource()
     } else {
-      map.once('load', applyTiles)
-      return () => { map.off('load', applyTiles) }
+      map.once('load', updateSource)
+      return () => { map.off('load', updateSource) }
     }
   }, [year, hasData])
 

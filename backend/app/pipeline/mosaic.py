@@ -159,6 +159,7 @@ def convert_to_cog(src_path: Path, out_path: Path) -> None:
         str(src_path),
         str(out_path),
         profile,
+        nodata=NODATA,
         overview_resampling="bilinear",
         config={
             "GDAL_TIFF_INTERNAL_MASK": True,
@@ -211,6 +212,13 @@ def main(year: int, skip_validate: bool) -> None:
     if len(sources) == 1:
         click.echo("\nSingle file — skipping mosaic step.")
         work_path = sources[0]
+
+        # Ensure nodata metadata is set (EOG files often lack it)
+        with rasterio.open(work_path) as ds:
+            if ds.nodata is None:
+                click.echo("  Setting nodata metadata on source file...")
+                with rasterio.open(work_path, "r+") as rw:
+                    rw.nodata = NODATA
     else:
         click.echo(f"\nMosaicking {len(sources)} GeoTIFF tiles...")
         tmp_file = tempfile.NamedTemporaryFile(suffix=".tif", delete=False)
