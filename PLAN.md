@@ -4,89 +4,58 @@ This document breaks the project into concrete, shippable phases. Each phase pro
 
 ---
 
-## Phase 1: Map with GIBS Overlay (Frontend Only)
+## Phase 1: Map with Base Overlay (Frontend Only) [DONE]
 
 **Goal:** A working light pollution map in the browser with no backend.
 
-**What you're building:**
-A React SPA that renders a MapLibre map with a dark basemap and a NASA GIBS nighttime lights tile overlay.
+**What was built:**
+A React SPA that renders a MapLibre map with a dark basemap and a nighttime lights tile overlay.
 
 **Tasks:**
 
-1. Scaffold the frontend:
-   ```bash
-   cd frontend
-   npm create vite@latest . -- --template react-ts
-   npm install maplibre-gl react-map-gl
-   ```
+1. Scaffold the frontend with Vite + React + TypeScript
+2. Create the `Map` component with Carto Dark Matter basemap
+3. Create the `BortleLegend` component
+4. Wire up a click handler (lat/lng display)
+5. Add a minimal header
 
-2. Create the `Map` component:
-   - Full-viewport MapLibre instance
-   - Carto Dark Matter basemap
-   - GIBS `VIIRS_Black_Marble` raster tile overlay at 60% opacity
-   - Basic zoom/pan controls
-
-3. Create the `BortleLegend` component:
-   - Static color ramp legend positioned bottom-right
-   - Labels for each Bortle class (1–9)
-   - Semi-transparent dark background panel
-
-4. Wire up a click handler:
-   - On map click, show a popup with the lat/lng coordinates
-   - (No radiance query yet — just coordinates)
-
-5. Add a minimal header with the project name and a GitHub link.
-
-**Deliverable:** A deployable static site you can push to Vercel/Netlify. The GIBS overlay is the "heat map" — it's not custom-colored yet, but it proves the map rendering pipeline works.
-
-**Estimated effort:** 3–5 hours.
+**Deliverable:** A deployable static site on Vercel/Netlify.
 
 ---
 
-## Phase 2: Data Pipeline
+## Phase 2: Data Pipeline [DONE]
 
-**Goal:** Download VIIRS data and process it into a Cloud-Optimized GeoTIFF (COG).
+**Goal:** Download VIIRS data from GEE and process it into a Cloud-Optimized GeoTIFF (COG).
 
-**What you're building:**
-A set of Python CLI scripts that download raw NASA data and produce one COG per year. The COG is the only processed artifact — colorization and reprojection happen at serve time.
+**What was built:**
+Python CLI scripts that download from Google Earth Engine and produce one COG per year.
 
 **Tasks:**
 
 1. Set up the backend Python project:
    ```bash
    cd backend
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install rasterio numpy requests click rio-cogeo
+   uv venv .venv --python 3.12
+   uv pip install -r requirements.txt --python .venv/bin/python
    ```
 
-2. Write `pipeline/download.py`:
-   - Accept a year argument (e.g., `--year 2023`)
-   - Download VNP46A4 annual composite GeoTIFFs from EOG
-   - URL pattern: `https://eogdata.mines.edu/nighttime_light/annual/v22/{year}/`
-   - The "vcm-orm-ntl" variant is the one you want (outlier-removed, background zeroed)
-   - Save to `data/raw/{year}/`
-   - Implement resume capability (check file size before re-downloading)
+2. `pipeline/download.py` — Download from GEE:
+   ```bash
+   # One-time auth
+   earthengine authenticate
 
-3. Write `pipeline/mosaic.py`:
-   - Merge the 6 tiles into a single raster using rasterio
-   - Build GDAL overviews with `gdaladdo -r bilinear`
-   - Convert to COG with `gdal_translate -of COG -co COMPRESS=DEFLATE -co PREDICTOR=3`
-   - Output: `data/processed/{year}_cog.tif` (float32, EPSG:4326, ~3–5 GB)
-   - Validate with `rio cogeo validate data/processed/{year}_cog.tif`
-
-4. Create a `Makefile` or `justfile` with targets:
-   ```makefile
-   download-2023:
-       python -m app.pipeline.download --year 2023
-
-   process-2023: download-2023
-       python -m app.pipeline.mosaic --year 2023
+   # Download
+   make download YEAR=2023
    ```
 
-**Deliverable:** A `data/processed/2023_cog.tif` you can inspect in QGIS and validate with `rio cogeo validate`. The raw radiance values are preserved and ready for the tile server to colorize on demand.
+3. `pipeline/mosaic.py` — Build COG:
+   ```bash
+   make process YEAR=2023
+   ```
 
-**Estimated effort:** 8–15 hours (mostly fighting rasterio/GDAL quirks).
+4. Makefile targets: `download`, `process`, `pipeline`, `validate`
+
+**Deliverable:** A `data/processed/2023_cog.tif` you can inspect in QGIS and validate with `rio cogeo validate`.
 
 ---
 
@@ -108,7 +77,7 @@ A set of Python CLI scripts that download raw NASA data and produce one COG per 
 
 3. Write `app/routers/tiles.py` and `app/services/tile_renderer.py`:
    - `GET /api/v1/tiles/{year}/{z}/{x}/{y}.png`
-   - Use rio-tiler to read the COG for that year, render the 256×256 tile window, apply the Bortle color ramp
+   - Use rio-tiler to read the COG for that year, render the 256x256 tile window, apply the Bortle color ramp
    - Return 404 if the tile is outside the COG extent (`TileOutsideBounds`)
    - Set `Cache-Control: public, max-age=31536000, immutable`
 
@@ -125,7 +94,7 @@ A set of Python CLI scripts that download raw NASA data and produce one COG per 
    - Return sorted list of available years
 
 6. Update the frontend:
-   - Swap the GIBS tile URL for `http://localhost:8000/api/v1/tiles/{year}/{z}/{x}/{y}.png`
+   - Swap the tile URL for `http://localhost:8000/api/v1/tiles/{year}/{z}/{x}/{y}.png`
    - Add a `YearSelector` component (dropdown)
    - On year change, update the tile source URL and reload the layer
 
@@ -134,8 +103,6 @@ A set of Python CLI scripts that download raw NASA data and produce one COG per 
    - Display radiance value, Bortle class, and SQM estimate in the popup
 
 **Deliverable:** A fully working local dev setup where the frontend talks to the FastAPI backend, rendering your custom-colored tiles and providing point queries.
-
-**Estimated effort:** 5–8 hours.
 
 ---
 
@@ -147,8 +114,6 @@ A set of Python CLI scripts that download raw NASA data and produce one COG per 
 
 1. **Search bar:**
    - Add geocoding via Nominatim (OpenStreetMap's free geocoding API)
-   - `https://nominatim.openstreetmap.org/search?q={query}&format=json`
-   - Rate limit to 1 req/sec per Nominatim's usage policy
    - On result select, fly the map to that location
 
 2. **Geolocation:**
@@ -157,30 +122,23 @@ A set of Python CLI scripts that download raw NASA data and produce one COG per 
 
 3. **"Find darkest sky near me" (stretch):**
    - Given user's location, search outward for the nearest tile below a radiance threshold
-   - This is a fun feature that's hard to find elsewhere
 
 4. **Responsive design:**
    - Collapse legend/controls into a bottom sheet or hamburger on mobile
-   - Touch-friendly map interaction (MapLibre handles this natively)
 
 5. **README.md:**
    - Clear project description with a screenshot/GIF
    - Live demo link
    - Local dev setup instructions
-   - Architecture overview (link to docs/)
-   - Data attribution
-   - License
 
 6. **Deploy:**
-   - Frontend → Vercel or Netlify
-   - Backend → Fly.io (Dockerfile)
-   - COG files → Cloudflare R2 (rio-tiler reads them via HTTPS range requests; no need to copy to the instance)
+   - Frontend -> Vercel or Netlify
+   - Backend -> Fly.io (Dockerfile)
+   - COG files -> Cloudflare R2
 
 7. **CI:**
    - GitHub Actions workflow for lint + typecheck (frontend)
    - GitHub Actions workflow for ruff + mypy (backend)
-
-**Estimated effort:** 8–12 hours.
 
 ---
 
@@ -192,8 +150,8 @@ These are nice-to-haves that further differentiate the project:
 - **Trend overlay:** Show areas where light pollution increased/decreased (diff of two years)
 - **Dark Sky Parks:** Overlay International Dark-Sky Association certified locations
 - **Observatory locations:** Overlay IAU observatory positions
-- **Time-lapse animation:** Animate through years 2012–2024
-- **Bortle sky simulation:** On click, show a simulated sky view at that Bortle level (what the stars actually look like)
+- **Time-lapse animation:** Animate through years 2014-2023
+- **Bortle sky simulation:** On click, show a simulated sky view at that Bortle level
 
 ---
 
@@ -225,8 +183,12 @@ uvicorn[standard]>=0.34.0
 rasterio>=1.4.0
 numpy>=2.0.0
 rio-tiler>=7.0.0
+rio-cogeo>=5.0.0
 click>=8.1.0
-requests>=2.32.0
 pyproj>=3.7.0
 pydantic>=2.10.0
+Pillow>=10.0.0
+rich>=13.0.0
+earthengine-api>=0.1.390
+geemap>=0.33.0
 ```

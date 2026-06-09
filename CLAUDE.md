@@ -55,16 +55,17 @@ dark-finder/
 ### Backend
 - **Framework:** FastAPI (Python 3.12+)
 - **Geospatial:** rasterio, numpy, pyproj
-- **Tile generation:** rio-tiler or gdal2tiles
-- **Data format:** GeoTIFF (VIIRS VNP46A4 annual composites from EOG)
-- **Task runner:** Make or just (for pipeline commands)
+- **Tile serving:** rio-tiler (on-the-fly COG rendering)
+- **Data format:** GeoTIFF (VIIRS VNL V2.2 annual composites via GEE)
+- **Task runner:** Make (for pipeline commands)
 
 ### Data Source
-- **NASA Black Marble VNP46A4** annual composites from the Earth Observation Group at Colorado School of Mines
-- URL: https://eogdata.mines.edu/products/vnl/
-- Format: GeoTIFF, 15 arc-second resolution, public domain
-- Coverage: 2012–2024, 6 tiles per year covering 75°N to 65°S
-- The data is **public domain** with no usage restrictions
+- **VIIRS VNL V2.2** annual composites from EOG (Colorado School of Mines) via Google Earth Engine
+- GEE collection: `NOAA/VIIRS/DNB/ANNUAL_V22`
+- Band: `average_masked`
+- Format: GeoTIFF, 15 arc-second resolution, EPSG:4326, public domain
+- Coverage: 2014-2023
+- Authentication: `earthengine authenticate` (one-time, no .env credentials needed)
 
 ## Key Conventions
 
@@ -94,48 +95,57 @@ dark-finder/
 - Branch naming: `feat/description`, `fix/description`, `pipeline/description`
 - Keep commits atomic — one logical change per commit
 
-## Color Ramp (Radiance → Visual)
+## Color Ramp (Radiance -> Visual)
 
-The heat map color ramp maps VIIRS radiance values (nW/cm²/sr) to colors inspired by the Bortle scale:
+The heat map color ramp maps VIIRS radiance values (nW/cm2/sr) to colors inspired by the Bortle scale:
 
 | Radiance Range     | Color          | Bortle Class | Description           |
 |--------------------|----------------|-------------|-----------------------|
-| 0.0 – 0.2         | `#000011`      | 1           | Pristine dark sky     |
-| 0.2 – 0.4         | `#000033`      | 2           | Typical dark site     |
-| 0.4 – 1.0         | `#003366`      | 3           | Rural sky             |
-| 1.0 – 3.0         | `#006633`      | 4           | Rural/suburban        |
-| 3.0 – 6.0         | `#339900`      | 5           | Suburban sky          |
-| 6.0 – 12.0        | `#CCCC00`      | 6           | Bright suburban       |
-| 12.0 – 30.0       | `#FF6600`      | 7           | Suburban/urban        |
-| 30.0 – 60.0       | `#CC0000`      | 8           | City sky              |
+| 0.0 - 0.2         | `#000011`      | 1           | Pristine dark sky     |
+| 0.2 - 0.4         | `#000033`      | 2           | Typical dark site     |
+| 0.4 - 1.0         | `#003366`      | 3           | Rural sky             |
+| 1.0 - 3.0         | `#006633`      | 4           | Rural/suburban        |
+| 3.0 - 6.0         | `#339900`      | 5           | Suburban sky          |
+| 6.0 - 12.0        | `#CCCC00`      | 6           | Bright suburban       |
+| 12.0 - 30.0       | `#FF6600`      | 7           | Suburban/urban        |
+| 30.0 - 60.0       | `#CC0000`      | 8           | City sky              |
 | 60.0+             | `#FFFFFF`      | 9           | Inner-city sky        |
 
 These thresholds are approximate. The exact mapping should be refined against reference SQM measurements. The color ramp is defined once in the backend pipeline and once as a legend constant in the frontend.
 
 ## Development Workflow
 
-### Phase 1 (MVP): NASA GIBS tiles
-Use NASA GIBS pre-rendered tiles as the overlay source — no backend needed yet. This gets a working map in the browser immediately.
+### Data Pipeline
+Download VIIRS data from GEE, process into a COG, serve tiles on-the-fly from FastAPI.
 
-GIBS tile URL pattern (Black Marble, EPSG:3857):
+```bash
+# One-time GEE auth
+earthengine authenticate
+
+# Download + process
+make pipeline YEAR=2023
+
+# Or step by step:
+make download YEAR=2023
+make process YEAR=2023
 ```
-https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png
+
+### Running the App
+```bash
+# Terminal 1: Frontend
+make dev-frontend
+
+# Terminal 2: Backend
+make dev-backend
 ```
-
-### Phase 2: Custom data pipeline + tile server
-Download EOG annual composites, process with rasterio/numpy, generate custom-colored tile pyramids, serve from FastAPI.
-
-### Phase 3: Polish
-Click-to-query, year selector, Bortle legend, location search, geolocation, "find darkest sky near me."
 
 ## Important Notes for Claude Code
 
 - When working on the frontend, `cd frontend` first. The Vite dev server runs from there.
 - When working on the backend, `cd backend` first. The FastAPI server runs from there.
 - Never commit anything in `backend/data/` or `backend/tiles/` — these are gitignored and can be multiple GB.
-- The VIIRS GeoTIFFs are large (hundreds of MB per tile, 6 tiles per year). Pipeline scripts should be resumable and handle partial downloads.
+- The VIIRS GeoTIFFs are large (hundreds of MB to several GB). Pipeline scripts should be resumable.
 - MapLibre GL JS uses `maplibre-gl` on npm, not `mapbox-gl`. They are API-compatible but the package name matters.
 - The Carto Dark Matter basemap URL is: `https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png` (no API key needed, subject to fair use terms).
-- For tile serving, prefer pre-generating static PNG tile pyramids over on-the-fly rendering. On-the-fly is a fallback for zoom levels or years that haven't been pre-generated.
 - Python virtual environment should be in `backend/.venv/` (gitignored).
 - Use `uv` for Python package management if available, otherwise `pip`.

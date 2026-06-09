@@ -1,11 +1,13 @@
 """
-Quick data quality check for downloaded VNP46A4 tiles.
+Data quality check for GEE-downloaded VIIRS GeoTIFFs.
+
+Opens GeoTIFF(s) in data/raw/{year}/, checks CRS is EPSG:4326, reports
+basic stats, and spot-checks radiance at known city coordinates.
 
 Usage:
     python -m app.pipeline.validate --year 2023
 """
 
-import math
 import sys
 from pathlib import Path
 
@@ -15,11 +17,7 @@ import rasterio
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
-R = 6371007.181
-TILE_SIZE_M = R * math.pi * 2 / 36
-PX = TILE_SIZE_M / 2400
-
-# Key cities and their expected MODIS tile (h, v)
+# Key cities with (lat, lon) for spot-checking radiance values
 CITIES = [
     ("Los Angeles",  34.05, -118.24),
     ("Denver",       39.74, -104.99),
@@ -33,98 +31,106 @@ CITIES = [
 ]
 
 
-def tile_for_point(lat, lon):
-    """Return (h, v) MODIS tile indices for a WGS84 point."""
-    y = lat * math.pi / 180 * R
-    x = lon * math.pi / 180 * R * math.cos(lat * math.pi / 180)
-    h = math.floor(x / TILE_SIZE_M) + 18
-    v = 9 - math.ceil(y / TILE_SIZE_M)
-    return h, v
-
-
-def rowcol_in_tile(lat, lon, h, v):
-    """Row and column of a WGS84 point within tile (h, v)."""
-    tile_left = (h - 18) * TILE_SIZE_M
-    tile_top  = (9 - v)  * TILE_SIZE_M
-    y = lat * math.pi / 180 * R
-    x = lon * math.pi / 180 * R * math.cos(lat * math.pi / 180)
-    row = int((tile_top - y) / PX)
-    col = int((x - tile_left) / PX)
-    return row, col
+def sample_point(ds, lat: float, lon: float) -> float | None:
+    """Sample a single pixel value at (lat, lon) using rasterio's index method."""
+    try:
+        row, col = ds.index(lon, lat)
+    except Exception:
+        return None
+    if 0 <= row < ds.height and 0 <= col < ds.width:
+        val = ds.read(1, window=rasterio.windows.Window(col, row, 1, 1))
+        return float(val[0, 0])
+    return None
 
 
 @click.command()
 @click.option("--year", required=True, type=int)
 def main(year: int) -> None:
+    """Validate GEE-downloaded VIIRS GeoTIFFs for a given year."""
     raw_dir = DATA_DIR / "raw" / str(year)
-    tiles = sorted(
-        p for p in raw_dir.glob("VNP46A4.*.tif") if f"A{year}" in p.name
-    )
-    if not tiles:
-        click.echo(f"No tiles found in {raw_dir}", err=True)
+
+    # Find GeoTIFFs
+    tifs = sorted(raw_dir.glob(f"VNL_V22_{year}_average_masked.tif"))
+    if not tifs:
+        tifs = sorted(raw_dir.glob("*average_masked*.tif"))
+    if not tifs:
+        tifs = sorted(raw_dir.glob("*.tif"))
+    if not tifs:
+        click.echo(f"No GeoTIFF files found in {raw_dir}", err=True)
         sys.exit(1)
 
-    click.echo(f"Found {len(tiles)} tiles for {year}\n")
+    click.echo(f"Found {len(tifs)} GeoTIFF(s) for {year}\n")
 
-    # Per-tile summary
-    click.echo(f"{'Tile':<12}  {'Nonzero':>8}  {'Max nW':>8}  {'Notes'}")
-    click.echo("-" * 50)
-    problem_tiles = []
-    for p in tiles:
-        hv = next(
-            (part for part in p.stem.split(".") if part.startswith("h") and "v" in part),
-            p.stem
-        )
+    # Per-file summary
+    click.echo(f"{'File':<45}  {'CRS':<12}  {'Size':>10}  {'Dims':>16}  {'Nodata':>8}")
+    click.echo("-" * 100)
+
+    for p in tifs:
         with rasterio.open(p) as ds:
-            d = ds.read(1)
-            nodata = ds.nodata
-            valid = d[d != nodata]
-            nonzero_pct = 100 * (valid > 0).sum() / d.size
-            max_val = valid.max() if len(valid) else 0.0
+            crs_str = str(ds.crs) if ds.crs else "None"
+            size_mb = p.stat().st_size / 1e6
+            dims = f"{ds.width}x{ds.height}"
+            nodata_str = str(ds.nodata) if ds.nodata is not None else "None"
 
-        note = ""
-        if nonzero_pct < 1.0:
-            note = "WARN: <1% nonzero — possible mask corruption"
-            problem_tiles.append(hv)
-        elif nonzero_pct < 5.0:
-            note = "low"
+            crs_ok = ds.crs is not None and ds.crs.to_epsg() == 4326
+            crs_flag = "" if crs_ok else " [WARN: expected EPSG:4326]"
 
-        click.echo(f"{hv:<12}  {nonzero_pct:7.1f}%  {max_val:8.2f}  {note}")
+            click.echo(
+                f"{p.name:<45}  {crs_str:<12}  {size_mb:>8.1f}MB  {dims:>16}  {nodata_str:>8}"
+                f"{crs_flag}"
+            )
+
+    # Stats on the first (or only) file
+    click.echo(f"\n--- Raster statistics ({tifs[0].name}) ---")
+    with rasterio.open(tifs[0]) as ds:
+        data = ds.read(1)
+        nodata = ds.nodata
+
+        if nodata is not None:
+            valid = data[data != nodata]
+        else:
+            valid = data[~np.isnan(data)]
+
+        total_pixels = data.size
+        nonzero = (valid > 0).sum()
+        pct_nonzero = 100 * nonzero / total_pixels if total_pixels > 0 else 0
+
+        click.echo(f"  Total pixels:   {total_pixels:,}")
+        click.echo(f"  Valid pixels:   {len(valid):,}")
+        click.echo(f"  Nonzero:        {nonzero:,} ({pct_nonzero:.1f}%)")
+        if len(valid) > 0:
+            click.echo(f"  Min radiance:   {valid.min():.4f} nW/cm2/sr")
+            click.echo(f"  Max radiance:   {valid.max():.4f} nW/cm2/sr")
+            click.echo(f"  Mean radiance:  {valid.mean():.4f} nW/cm2/sr")
 
     # City spot-check
-    click.echo(f"\n{'City':<16}  {'Tile':<8}  {'Value':>10}  {'Status'}")
-    click.echo("-" * 55)
-    for name, lat, lon in CITIES:
-        h, v = tile_for_point(lat, lon)
-        hv = f"h{h:02d}v{v:02d}"
-        pattern = f"VNP46A4.A{year}001.{hv}.*.tif"
-        matches = list(raw_dir.glob(pattern))
-        if not matches:
-            click.echo(f"{name:<16}  {hv:<8}  {'N/A':>10}  tile not downloaded")
-            continue
+    click.echo(f"\n--- City spot-check ---")
+    click.echo(f"{'City':<16}  {'Value':>12}  {'Status'}")
+    click.echo("-" * 50)
 
-        row, col = rowcol_in_tile(lat, lon, h, v)
-        with rasterio.open(matches[0]) as ds:
-            d = ds.read(1)
-        val = d[row, col] if 0 <= row < 2400 and 0 <= col < 2400 else None
+    with rasterio.open(tifs[0]) as ds:
+        for name, lat, lon in CITIES:
+            val = sample_point(ds, lat, lon)
 
-        if val is None:
-            status = "out of bounds"
-        elif val <= 0:
-            status = "WARN: zero radiance at city center"
-        elif val < 0.5:
-            status = f"low ({val:.4f} nW)"
-        else:
-            status = f"ok ({val:.3f} nW)"
+            if val is None:
+                status = "out of bounds"
+                val_str = "N/A"
+            elif nodata is not None and val == nodata:
+                status = "nodata"
+                val_str = "nodata"
+            elif val <= 0:
+                status = "WARN: zero radiance at city center"
+                val_str = f"{val:.4f}"
+            elif val < 0.5:
+                status = f"low ({val:.4f} nW)"
+                val_str = f"{val:.4f}"
+            else:
+                status = "ok"
+                val_str = f"{val:.3f}"
 
-        click.echo(f"{name:<16}  {hv:<8}  {(val if val is not None else 0):>10.4f}  {status}")
+            click.echo(f"{name:<16}  {val_str:>12}  {status}")
 
-    if problem_tiles:
-        click.echo(f"\nProblem tiles ({len(problem_tiles)}): {', '.join(problem_tiles)}")
-        click.echo("These tiles have <1% nonzero pixels — land/water mask may be corrupted.")
-        click.echo("Consider re-downloading or switching to PRODUCT_VERSION=1 (year <= 2022).")
-    else:
-        click.echo("\nAll tiles look reasonable.")
+    click.echo("\nValidation complete.")
 
 
 if __name__ == "__main__":

@@ -4,116 +4,77 @@ This document covers the specifics of working with NASA VIIRS nighttime lights d
 
 ## Data Source Details
 
-### EOG VNP46A4 Annual Composites
+### VIIRS VNL V2.2 via Google Earth Engine
 
-The Earth Observation Group (EOG) at Colorado School of Mines publishes annual VIIRS nighttime lights composites. These are the same data products used by lightpollutionmap.info.
+The Earth Observation Group (EOG) at Colorado School of Mines publishes annual VIIRS nighttime lights composites. DarkFinder accesses these through Google Earth Engine's public catalog, which hosts the same data without requiring EOG credentials.
 
-**Download base URL:**
+**GEE collection:**
 ```
-https://eogdata.mines.edu/nighttime_light/annual/v22/
-```
-
-**Directory structure on EOG:**
-```
-/nighttime_light/annual/v22/{year}/
-  VNL_v22_npp_{year}0101-{year}1231_global_vcmslcfg_c202XXXXXXXX.average.tif
-  VNL_v22_npp_{year}0101-{year}1231_global_vcmslcfg_c202XXXXXXXX.average_masked.tif
-  VNL_v22_npp_{year}0101-{year}1231_global_vcmslcfg_c202XXXXXXXX.cf_cvg.tif
-  ...
+NOAA/VIIRS/DNB/ANNUAL_V22
 ```
 
-**Which file to use:**
-- Use the `average_masked` variant — this has background (non-light) values set to zero and outliers removed
-- Alternatively, use `vcm-orm-ntl` if available (outlier-removed, nighttime-lights only)
-- The `cf_cvg` file contains cloud-free observation counts — useful for quality assessment but not for the heat map
+**Band:** `average_masked` (background zeroed, outliers removed)
 
-**File properties:**
+**Authentication:**
+```bash
+# One-time setup — opens a browser for Google account auth
+earthengine authenticate
+```
+
+No `.env` credentials are needed. GEE auth tokens are stored locally by the `earthengine` CLI.
+
+**File properties (after download):**
 - Format: GeoTIFF, single-band float32
 - CRS: EPSG:4326 (geographic lat/lon)
 - Resolution: 15 arc-seconds (~450m at equator)
-- Extent: -180 to 180 longitude, -65 to 75 latitude
-- No-data value: typically `NaN` or a large negative number; check with `gdalinfo`
-- Values: radiance in nW/cm²/sr
-- Size: 2-3 GB per global file (or ~500MB per tile if tiled into 6 pieces)
-
-### Alternative: NASA LAADS DAAC (VNP46A4 / VJ146A4)
-
-The same data is also available from NASA's LAADS DAAC in HDF5 format, tiled in the sinusoidal grid. This is harder to work with — prefer the EOG GeoTIFFs.
-
-If you do use LAADS DAAC:
-- Requires a NASA Earthdata account and bearer token
-- HDF5 format with multiple science datasets (SDS)
-- The relevant SDS is `AllAngle_Composite_Snow_Free` (or `NearNadir_Composite_Snow_Free`)
-- Tiled in the MODIS sinusoidal grid (10°×10° tiles), requiring mosaicking
+- Extent: depends on --bbox flag (default: North America; use --global for full coverage)
+- No-data value: -9999.0
+- Values: radiance in nW/cm2/sr
+- Size: varies by region (North America ~500MB, global ~2-3 GB)
 
 ## Processing Pipeline
 
-### Step 1: Download
+### Step 1: Download from GEE
 
-```python
-# Key considerations:
-# - Files are 2-3 GB each; use streaming downloads
-# - EOG server can be slow; implement retry logic
-# - Check file integrity after download (file size at minimum)
-# - Store in data/raw/{year}/
+```bash
+# North America (default bbox)
+make download YEAR=2023
 
-import requests
+# Custom bounding box
+make download YEAR=2023 BBOX="-130,24,-60,50"
 
-def download_file(url: str, dest: str) -> None:
-    """Download with resume support."""
-    headers = {}
-    existing_size = 0
-    if os.path.exists(dest):
-        existing_size = os.path.getsize(dest)
-        headers['Range'] = f'bytes={existing_size}-'
-    
-    response = requests.get(url, headers=headers, stream=True)
-    mode = 'ab' if existing_size else 'wb'
-    
-    with open(dest, mode) as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
+# Or directly:
+cd backend
+python -m app.pipeline.download --year 2023
+python -m app.pipeline.download --year 2023 --global
 ```
 
-### Step 2: Mosaic → COG
+The download script uses `geemap.download_ee_image()` which automatically tiles large regions. Data arrives already in EPSG:4326 — no reprojection needed.
 
-Merge the 6 tiles and save as a Cloud-Optimized GeoTIFF. This is the only processed artifact — reprojection and colorization happen at serve time.
+Output: `data/raw/{year}/VNL_V22_{year}_average_masked.tif`
 
-```python
-import subprocess
-import rasterio
-from rasterio.merge import merge
+### Step 2: Process to COG
 
-# Mosaic the 6 source tiles:
-datasets = [rasterio.open(f) for f in tile_paths]
-mosaic, mosaic_transform = merge(datasets)
-# Write the merged raster to a temporary file first...
+```bash
+make process YEAR=2023
 
-# Build overviews (must happen before the COG conversion):
-subprocess.run([
-    "gdaladdo", "-r", "bilinear", merged_path,
-    "2", "4", "8", "16", "32", "64", "128", "256"
-], check=True)
-
-# Convert to COG with compression:
-subprocess.run([
-    "gdal_translate",
-    "-of", "COG",
-    "-co", "COMPRESS=DEFLATE",
-    "-co", "PREDICTOR=3",        # float predictor — better compression on float32
-    "-co", "RESAMPLING=BILINEAR",
-    "-co", "OVERVIEWS=IGNORE_EXISTING",
-    merged_path,
-    output_cog_path,             # e.g. data/processed/2023_cog.tif
-], check=True)
+# Or directly:
+cd backend
+python -m app.pipeline.mosaic --year 2023
 ```
 
-Output: `data/processed/{year}_cog.tif` — single-band float32, EPSG:4326, internally tiled with overview pyramid. Size: ~3–5 GB per year.
+This step:
+1. Discovers GeoTIFF(s) in `data/raw/{year}/`
+2. If multiple files, merges them with a streaming mosaic (memory-safe)
+3. Builds GDAL overview levels (2x through 256x)
+4. Converts to a Cloud-Optimized GeoTIFF with DEFLATE compression
+5. Validates the COG structure
+
+Output: `data/processed/{year}_cog.tif` — single-band float32, EPSG:4326, internally tiled with overview pyramid.
 
 **Gotchas:**
 - Keep the COG in EPSG:4326. Do not reproject to EPSG:3857. rio-tiler handles per-tile reprojection at serve time; a global reproject produces a larger, distorted file with no benefit for storage.
 - `PREDICTOR=3` is the floating-point predictor for DEFLATE. It significantly improves compression on float32 data.
-- Overviews must be built *before* `gdal_translate -of COG` — the COG driver embeds them from the source file.
 - Verify the output: `rio cogeo validate data/processed/2023_cog.tif` (requires `rio-cogeo` package).
 
 ### Step 3: Tile Serving
@@ -185,31 +146,31 @@ def render_tile(cog_path: str, x: int, y: int, z: int) -> bytes | None:
 - Cache rendered tiles at the HTTP layer (`Cache-Control: public, max-age=31536000, immutable`). The data is annual and immutable once processed.
 - The COG can be read directly from remote storage (e.g. Cloudflare R2) by passing a `/vsicurl/https://...` path to rio-tiler. GDAL's range-request support means only the needed tile window is fetched over the network.
 
-## Radiance → Bortle / SQM Conversion
+## Radiance -> Bortle / SQM Conversion
 
 These are approximate conversions. The relationship between satellite-measured radiance and ground-level sky quality is model-dependent and affected by atmospheric conditions, elevation, and the observer's specific location relative to light sources.
 
-**Radiance (nW/cm²/sr) → approximate SQM (mag/arcsec²):**
+**Radiance (nW/cm2/sr) -> approximate SQM (mag/arcsec2):**
 ```
-SQM ≈ 22.0 - 2.5 * log10(radiance / 0.171 + 1)
+SQM ~ 22.0 - 2.5 * log10(radiance / 0.171 + 1)
 ```
 This is a rough formula. The actual lightpollutionmap.info uses a more sophisticated sky brightness model (convolving radiance with atmospheric scattering kernels and elevation data). For a v1, the rough formula is fine.
 
-**SQM → Bortle class:**
-| SQM Range         | Bortle |
+**SQM -> Bortle class:**
+| SQM Range          | Bortle |
 |--------------------|--------|
 | > 21.75            | 1      |
-| 21.50 – 21.75      | 2      |
-| 21.25 – 21.50      | 3      |
-| 20.50 – 21.25      | 4      |
-| 19.50 – 20.50      | 5      |
-| 18.50 – 19.50      | 6      |
-| 18.00 – 18.50      | 7      |
-| < 18.00            | 8–9    |
+| 21.50 - 21.75      | 2      |
+| 21.25 - 21.50      | 3      |
+| 20.50 - 21.25      | 4      |
+| 19.50 - 20.50      | 5      |
+| 18.50 - 19.50      | 6      |
+| 18.00 - 18.50      | 7      |
+| < 18.00            | 8-9    |
 
 ## Performance Notes
 
-- A full global raster at 15 arc-second resolution is approximately 86400 × 33600 pixels. At float32, that's ~11 GB uncompressed; with DEFLATE + float predictor the COG compresses to ~3–5 GB.
-- The download + mosaic + COG pipeline for one year takes roughly 30–90 minutes on a modern laptop, depending on internet speed and CPU cores. There is no slow tile-generation step.
-- rio-tiler renders a single 256×256 tile from a COG in ~5–50ms depending on zoom level and whether GDAL's block cache is warm.
+- A full global raster at 15 arc-second resolution is approximately 86400 x 33600 pixels. At float32, that's ~11 GB uncompressed; with DEFLATE + float predictor the COG compresses to ~3-5 GB.
+- The download + COG pipeline for one year takes roughly 15-60 minutes depending on region size and internet speed. There is no slow tile-generation step.
+- rio-tiler renders a single 256x256 tile from a COG in ~5-50ms depending on zoom level and whether GDAL's block cache is warm.
 - For an initial setup, processing just 2023 and one comparison year (e.g., 2015) is sufficient to demonstrate the pipeline and year-comparison capability.

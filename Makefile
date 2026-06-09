@@ -1,5 +1,5 @@
 .PHONY: dev-frontend dev-backend install lint typecheck \
-        download download-nasa download-gee process pipeline pipeline-gee
+        download process pipeline validate
 
 PYTHON := .venv/bin/python
 YEAR   ?= 2023
@@ -27,32 +27,24 @@ lint:
 typecheck:
 	cd frontend && npx tsc --noEmit
 
-# ── Data pipeline ─────────────────────────────────────────────────────────────
+# ── Data pipeline (GEE) ─────────────────────────────────────────────────────
+# Requires: earthengine authenticate  (one-time)
+#
 # Usage:
-#   make download YEAR=2023                          # EOG global composite
-#   make download YEAR=2023 URL="https://..."        # EOG with explicit URL
-#   make download-nasa YEAR=2023                     # NASA VNP46A4 (v2 tiles)
-#   make download-nasa YEAR=2023 BBOX="-130,24,-60,50"
+#   make download YEAR=2023                           # default bbox (North America)
+#   make download YEAR=2023 BBOX="-130,24,-60,50"     # custom bbox
 #   make process  YEAR=2023
 #   make pipeline YEAR=2023   (download + process)
 
 BBOX ?= -170,5,-40,75
 
 download:
-	cd backend && $(PYTHON) -m app.pipeline.download --year $(YEAR) $(if $(URL),--url "$(URL)",)
-
-download-nasa:
-	cd backend && $(PYTHON) -m app.pipeline.download_nasa --year $(YEAR) $(if $(BBOX),--bbox "$(BBOX)",)
-
-download-gee:
-	cd backend && $(PYTHON) -m app.pipeline.download_gee --year $(YEAR) $(if $(BBOX),--bbox "$(BBOX)",)
+	cd backend && $(PYTHON) -m app.pipeline.download --year $(YEAR) $(if $(BBOX),--bbox "$(BBOX)",)
 
 process:
 	cd backend && $(PYTHON) -m app.pipeline.mosaic --year $(YEAR)
 
 pipeline: download process
-
-pipeline-gee: download-gee process
 
 validate:
 	cd backend && $(PYTHON) -m app.pipeline.validate --year $(YEAR)
