@@ -1,5 +1,5 @@
 .PHONY: dev-frontend dev-backend install lint typecheck \
-        download process pipeline validate
+        download process skyglow pipeline validate
 
 PYTHON := .venv/bin/python
 YEAR   ?= 2023
@@ -10,7 +10,7 @@ dev-frontend:
 	cd frontend && npm run dev
 
 dev-backend:
-	cd backend && ../.venv/bin/uvicorn app.main:app --reload
+	cd backend && .venv/bin/uvicorn app.main:app --reload
 
 # ── Setup ──────────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,10 @@ download:
 
 process:
 	cd backend && $(PYTHON) -m app.pipeline.mosaic --year $(YEAR)
+	cd backend && $(PYTHON) -m app.pipeline.skyglow --year $(YEAR)
+
+skyglow:
+	cd backend && $(PYTHON) -m app.pipeline.skyglow --year $(YEAR)
 
 pipeline: download process
 

@@ -1,0 +1,38 @@
+.wrapper {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.button {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: #9ca3af;
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.button:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e0e0e0;
+}
+
+.button.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

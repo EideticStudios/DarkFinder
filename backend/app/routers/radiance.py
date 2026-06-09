@@ -31,6 +31,7 @@ class RadianceResponse(BaseModel):
     bortle: int
     sqm: float
     year: int
+    skyglow: float | None = None
 
 
 @router.get("/radiance", response_model=RadianceResponse)
@@ -54,9 +55,27 @@ def get_radiance(lat: float, lng: float, year: int) -> RadianceResponse:
     # Treat nodata / negative values as zero radiance
     radiance = max(raw, 0.0) if not math.isnan(raw) else 0.0
 
+    # Sample sky-glow COG if available
+    skyglow_val: float | None = None
+    skyglow_path = PROCESSED_DIR / f"{year}_skyglow_cog.tif"
+    if skyglow_path.exists():
+        try:
+            from rasterio.warp import transform as rio_transform
+            with rasterio.open(skyglow_path) as ds:
+                xs, ys = rio_transform("EPSG:4326", ds.crs, [lng], [lat])
+                samples = list(ds.sample([(xs[0], ys[0])]))
+                raw_sg = float(samples[0][0])
+                skyglow_val = round(max(raw_sg, 0.0) if not math.isnan(raw_sg) else 0.0, 4)
+        except Exception:
+            pass  # skyglow sampling failure is non-fatal
+
+    # Use skyglow for SQM when available (better proxy than point emission)
+    sqm_source = skyglow_val if skyglow_val is not None else radiance
+
     return RadianceResponse(
         radiance=round(radiance, 4),
         bortle=_radiance_to_bortle(radiance),
-        sqm=_radiance_to_sqm(radiance),
+        sqm=_radiance_to_sqm(sqm_source),
         year=year,
+        skyglow=skyglow_val,
     )

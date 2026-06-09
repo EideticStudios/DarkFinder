@@ -1,16 +1,20 @@
 """
-Render a 256×256 PNG tile from a Cloud-Optimized GeoTIFF using the Bortle color ramp.
+Render a 256x256 PNG tile from a Cloud-Optimized GeoTIFF using either the
+Bortle color ramp (emission layer) or an lpm-style vivid ramp (sky-glow layer).
 """
 
 import io
+from typing import Literal
 
 import numpy as np
 from PIL import Image
 
-# Radiance breakpoints (nW/cm²/sr) — one per Bortle class boundary
+Layer = Literal["emission", "skyglow"]
+
+# ── Emission (Bortle) color ramp ──────────────────────────────────────────────
+
 BREAKPOINTS: list[float] = [0.0, 0.2, 0.4, 1.0, 3.0, 6.0, 12.0, 30.0, 60.0]
 
-# RGBA colors for each Bortle class (endpoints of each interpolation segment)
 COLORS: list[tuple[int, int, int, int]] = [
     (0x00, 0x00, 0x11, 200),  # Bortle 1 — pristine dark sky
     (0x00, 0x00, 0x33, 200),  # Bortle 2 — typical dark site
@@ -67,9 +71,86 @@ def apply_bortle_colormap(band: np.ndarray, valid_mask: np.ndarray) -> np.ndarra
     return rgba
 
 
-def render_tile(cog_path: str, z: int, x: int, y: int) -> bytes | None:
+# ── Sky-glow (lpm-style) color ramp ──────────────────────────────────────────
+
+SKYGLOW_ANCHORS: list[float] = [
+    0.01, 0.04, 0.12, 0.35, 1.0, 3.0, 8.0, 20.0, 45.0, 100.0,
+]
+
+SKYGLOW_COLORS: list[tuple[int, int, int]] = [
+    (0x02, 0x02, 0x2E),  # deep navy
+    (0x0B, 0x1E, 0x8C),  # navy blue
+    (0x1E, 0x64, 0xDC),  # blue
+    (0x00, 0xC8, 0xC8),  # cyan
+    (0x28, 0xB4, 0x28),  # green
+    (0xF0, 0xF0, 0x00),  # yellow
+    (0xFF, 0x8C, 0x00),  # orange
+    (0xFF, 0x1E, 0x1E),  # red
+    (0xFF, 0x50, 0xFF),  # magenta
+    (0xFF, 0xFF, 0xFF),  # white
+]
+
+
+def apply_skyglow_colormap(band: np.ndarray, valid_mask: np.ndarray) -> np.ndarray:
     """
-    Read a tile window from a COG and return Bortle-colored PNG bytes.
+    Map a float32 sky-glow band to RGBA using log10-interpolated vivid ramp.
+
+    Values below 0.01 fade alpha to 0 (reveal basemap in pristine areas).
+    Values >= 100 clamp to white. Invalid pixels are fully transparent.
+    """
+    h, w = band.shape
+    rgba = np.zeros((h, w, 4), dtype=np.uint8)
+    base_alpha = 235
+
+    safe = np.where((band > 0) & np.isfinite(band), band, 1e-10)
+    log_band = np.log10(safe)
+
+    for i in range(len(SKYGLOW_ANCHORS) - 1):
+        lo, hi = SKYGLOW_ANCHORS[i], SKYGLOW_ANCHORS[i + 1]
+        seg_mask = (band >= lo) & (band < hi)
+        if not np.any(seg_mask):
+            continue
+
+        log_lo, log_hi = np.log10(lo), np.log10(hi)
+        t = (log_band[seg_mask] - log_lo) / (log_hi - log_lo)
+
+        r0, g0, b0 = SKYGLOW_COLORS[i]
+        r1, g1, b1 = SKYGLOW_COLORS[i + 1]
+        rgba[seg_mask, 0] = np.clip(r0 + t * (r1 - r0), 0, 255).astype(np.uint8)
+        rgba[seg_mask, 1] = np.clip(g0 + t * (g1 - g0), 0, 255).astype(np.uint8)
+        rgba[seg_mask, 2] = np.clip(b0 + t * (b1 - b0), 0, 255).astype(np.uint8)
+        rgba[seg_mask, 3] = base_alpha
+
+    # Clamp >= 100 to white
+    top_mask = band >= SKYGLOW_ANCHORS[-1]
+    if np.any(top_mask):
+        r, g, b = SKYGLOW_COLORS[-1]
+        rgba[top_mask] = (r, g, b, base_alpha)
+
+    # Below lowest anchor: fade alpha from base_alpha (at 0.01) to 0 (at ~0.001)
+    fade_mask = (band > 0) & (band < SKYGLOW_ANCHORS[0]) & valid_mask
+    if np.any(fade_mask):
+        fade_t = np.clip(log_band[fade_mask] / np.log10(SKYGLOW_ANCHORS[0]), 0, 1)
+        r0, g0, b0 = SKYGLOW_COLORS[0]
+        rgba[fade_mask, 0] = r0
+        rgba[fade_mask, 1] = g0
+        rgba[fade_mask, 2] = b0
+        rgba[fade_mask, 3] = (fade_t * base_alpha).astype(np.uint8)
+
+    # Fully transparent for invalid / non-positive
+    invalid = (band <= 0) | np.isnan(band) | ~valid_mask
+    rgba[invalid, 3] = 0
+
+    return rgba
+
+
+# ── Tile rendering ────────────────────────────────────────────────────────────
+
+def render_tile(
+    cog_path: str, z: int, x: int, y: int, layer: Layer = "emission"
+) -> bytes | None:
+    """
+    Read a tile window from a COG and return colored PNG bytes.
     Returns None if the tile falls outside the COG extent.
     """
     try:
@@ -91,7 +172,10 @@ def render_tile(cog_path: str, z: int, x: int, y: int) -> bytes | None:
     raw_mask = img.mask if img.mask.ndim == 2 else img.mask[0]
     valid_mask = raw_mask != 0
 
-    rgba = apply_bortle_colormap(band, valid_mask)   # (H, W, 4)
+    if layer == "skyglow":
+        rgba = apply_skyglow_colormap(band, valid_mask)
+    else:
+        rgba = apply_bortle_colormap(band, valid_mask)
 
     pil_img = Image.fromarray(rgba, mode="RGBA")
     buf = io.BytesIO()

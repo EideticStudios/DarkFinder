@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import type { LayerId } from '../lib/layers'
 import styles from './Map.module.css'
 
 const CARTO_DARK_TILES = ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png']
@@ -11,20 +12,26 @@ const GIBS_TILES = [
   'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png',
 ]
 
-const TILE_VERSION = 2
+const TILE_VERSION = 3
 
-function tileUrl(year: number): string {
-  return `${API_BASE}/tiles/${year}/{z}/{x}/{y}.png?v=${TILE_VERSION}`
+function tileUrl(layer: LayerId, year: number): string {
+  return `${API_BASE}/tiles/${layer}/${year}/{z}/{x}/{y}.png?v=${TILE_VERSION}`
 }
 
 interface MapProps {
   year: number
+  layer: LayerId
   hasData: boolean
 }
 
-export default function Map({ year, hasData }: MapProps) {
+export default function Map({ year, layer, hasData }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  // Refs to avoid stale closures in the click handler
+  const yearRef = useRef(year)
+  const layerRef = useRef(layer)
+  yearRef.current = year
+  layerRef.current = layer
 
   // Initialize map once — hasData is already resolved before this mounts
   useEffect(() => {
@@ -44,7 +51,7 @@ export default function Map({ year, hasData }: MapProps) {
           },
           viirs: {
             type: 'raster',
-            tiles: hasData ? [tileUrl(year)] : GIBS_TILES,
+            tiles: hasData ? [tileUrl(layer, year)] : GIBS_TILES,
             tileSize: 256,
             maxzoom: 8,
             attribution: 'NASA Black Marble VIIRS &copy; NASA / EOG',
@@ -56,7 +63,7 @@ export default function Map({ year, hasData }: MapProps) {
             id: 'viirs-overlay',
             type: 'raster',
             source: 'viirs',
-            paint: { 'raster-opacity': 0.85 },
+            paint: { 'raster-opacity': layer === 'skyglow' ? 0.78 : 0.85 },
           },
         ],
       },
@@ -72,12 +79,13 @@ export default function Map({ year, hasData }: MapProps) {
 
     map.on('click', async (e) => {
       const { lat, lng } = e.lngLat
+      const currentYear = yearRef.current
 
       let html = `<strong>${lat.toFixed(4)}°, ${lng.toFixed(4)}°</strong><br/>`
 
       try {
         const resp = await fetch(
-          `${API_BASE}/radiance?lat=${lat}&lng=${lng}&year=${year}`
+          `${API_BASE}/radiance?lat=${lat}&lng=${lng}&year=${currentYear}`
         )
         if (resp.ok) {
           const data = await resp.json()
@@ -85,6 +93,9 @@ export default function Map({ year, hasData }: MapProps) {
             `Bortle class: <strong>${data.bortle}</strong><br/>` +
             `SQM: ${data.sqm} mag/arcsec²<br/>` +
             `Radiance: ${data.radiance} nW/cm²/sr`
+          if (data.skyglow != null) {
+            html += `<br/>Sky glow: ${data.skyglow} nW/cm²/sr`
+          }
         }
       } catch {
         // backend not available — show coords only
@@ -101,7 +112,7 @@ export default function Map({ year, hasData }: MapProps) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update tile source when year changes
+  // Update tile source and opacity when year or layer changes
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -110,8 +121,9 @@ export default function Map({ year, hasData }: MapProps) {
       const source = map.getSource('viirs') as maplibregl.RasterTileSource | undefined
       if (!source) return
 
-      const newTiles = hasData ? [tileUrl(year)] : GIBS_TILES
+      const newTiles = hasData ? [tileUrl(layer, year)] : GIBS_TILES
       source.setTiles(newTiles)
+      map.setPaintProperty('viirs-overlay', 'raster-opacity', layer === 'skyglow' ? 0.78 : 0.85)
     }
 
     if (map.isStyleLoaded()) {
@@ -120,7 +132,7 @@ export default function Map({ year, hasData }: MapProps) {
       map.once('load', updateSource)
       return () => { map.off('load', updateSource) }
     }
-  }, [year, hasData])
+  }, [year, layer, hasData])
 
   return <div ref={containerRef} className={styles.container} />
 }

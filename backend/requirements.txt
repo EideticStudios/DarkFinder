@@ -3,6 +3,7 @@ uvicorn[standard]>=0.34.0
 rasterio>=1.4.0
 numpy>=2.0.0
 rio-tiler>=7.0.0
+scipy>=1.14.0
 rio-cogeo>=5.0.0
 click>=8.1.0
 pyproj>=3.7.0
