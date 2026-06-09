@@ -161,7 +161,7 @@ def render_tile(
 
     try:
         with COGReader(cog_path) as cog:
-            img = cog.tile(x, y, z, resampling_method="bilinear")
+            img = cog.tile(x, y, z, resampling_method="bilinear", reproject_method="bilinear")
     except TileOutsideBounds:
         return None
 
