@@ -10,5 +10,7 @@ pyproj>=3.7.0
 pydantic>=2.10.0
 Pillow>=10.0.0
 rich>=13.0.0
+python-dotenv>=1.0.0
 earthengine-api>=0.1.390
 geemap>=0.33.0
+geedim>=2.0.0

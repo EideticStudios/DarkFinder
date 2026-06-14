@@ -31,15 +31,13 @@ typecheck:
 # Requires: earthengine authenticate  (one-time)
 #
 # Usage:
-#   make download YEAR=2023                           # default bbox (North America)
+#   make download YEAR=2023                           # global (default)
 #   make download YEAR=2023 BBOX="-130,24,-60,50"     # custom bbox
 #   make process  YEAR=2023
 #   make pipeline YEAR=2023   (download + process)
 
-BBOX ?= -170,5,-40,75
-
 download:
-	cd backend && $(PYTHON) -m app.pipeline.download --year $(YEAR) $(if $(BBOX),--bbox "$(BBOX)",)
+	cd backend && $(PYTHON) -m app.pipeline.download --year $(YEAR) $(if $(BBOX),--bbox "$(BBOX)",--global)
 
 process:
 	cd backend && $(PYTHON) -m app.pipeline.mosaic --year $(YEAR)

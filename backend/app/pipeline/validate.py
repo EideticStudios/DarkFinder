@@ -19,15 +19,22 @@ DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 # Key cities with (lat, lon) for spot-checking radiance values
 CITIES = [
+    # North America
     ("Los Angeles",  34.05, -118.24),
     ("Denver",       39.74, -104.99),
-    ("Minneapolis",  44.98,  -93.27),
-    ("Kansas City",  39.10,  -94.58),
     ("Chicago",      41.88,  -87.63),
-    ("Atlanta",      33.75,  -84.39),
     ("NYC",          40.71,  -74.01),
-    ("Boston",       42.36,  -71.06),
-    ("Miami",        25.76,  -80.19),
+    # Europe
+    ("London",       51.51,   -0.13),
+    ("Paris",        48.86,    2.35),
+    # Asia
+    ("Tokyo",        35.68,  139.69),
+    ("Shanghai",     31.23,  121.47),
+    ("Mumbai",       19.08,   72.88),
+    # Southern Hemisphere
+    ("Sydney",      -33.87,  151.21),
+    ("São Paulo",   -23.55,  -46.63),
+    ("Johannesburg",-26.20,   28.04),
 ]
 
 

@@ -8,13 +8,14 @@ truncated at max_distance. The kernel is normalized to sum=1, so output
 values are a weighted average of nearby radiance and stay on the same
 numeric order as the raw radiance (nW/cm²/sr).
 
-Because the bbox spans a wide latitude range (~5–75°N), the convolution
-runs in latitude bands with margin rows, rebuilding the kernel at each
-band's center latitude so km-per-pixel in longitude (cos(lat)) is right.
+The convolution runs in latitude bands with margin rows, rebuilding the
+kernel at each band's center latitude so km-per-pixel in longitude
+(cos(lat)) is correct at any latitude. Near the poles cos(lat) is clamped
+to 0.1 to prevent kernel explosion.
 
 Known limitation: `mode="same"` zero-pads at the raster borders, so glow
-is underestimated within ~200 km of the bbox edges. Those edges are ocean
-or arctic in the default bbox, which is acceptable.
+is underestimated within ~200 km of the edges. For global data this
+affects only the dateline (open Pacific Ocean) — negligible visual impact.
 
 Input:  data/processed/{year}_cog.tif
 Output: data/processed/{year}_skyglow_cog.tif
@@ -88,7 +89,7 @@ def build_kernel(
     normalized to sum=1. Longitude km-per-pixel is scaled by cos(latitude).
     """
     km_y = pixel_deg * KM_PER_DEG
-    km_x = km_y * float(np.cos(np.radians(center_lat_deg)))
+    km_x = km_y * max(float(np.cos(np.radians(center_lat_deg))), 0.1)
     ry = int(np.ceil(max_km / km_y))
     rx = int(np.ceil(max_km / km_x))
     dy = np.arange(-ry, ry + 1, dtype=np.float64)[:, None] * km_y

@@ -17,11 +17,13 @@ Usage:
     python -m app.pipeline.download --year 2023 --global
 """
 
+import os
 import sys
 from pathlib import Path
 
 import click
 import rasterio
+from dotenv import load_dotenv
 from rich.console import Console
 
 console = Console()
@@ -56,13 +58,22 @@ def main(year: int, bbox: str, global_coverage: bool) -> None:
                       "Run: pip install earthengine-api geemap")
         sys.exit(1)
 
-    console.print("Initializing Google Earth Engine...")
+    load_dotenv(DATA_DIR.parent / ".env")
+    project = os.getenv("GEE_PROJECT")
+    if not project:
+        console.print(
+            "[red]GEE_PROJECT not set.[/red]\n"
+            "Add GEE_PROJECT=your-gcp-project-id to backend/.env"
+        )
+        sys.exit(1)
+
+    console.print(f"Initializing Google Earth Engine (project={project})...")
     try:
-        ee.Initialize()
+        ee.Initialize(project=project)
     except Exception as exc:
         console.print(
             f"[red]GEE initialization failed:[/red] {exc}\n"
-            "Run [bold]earthengine authenticate[/bold] first."
+            "Run [bold].venv/bin/earthengine authenticate --project {project}[/bold] first."
         )
         sys.exit(1)
     console.print("  [green]Authenticated.[/green]")
