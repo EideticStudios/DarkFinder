@@ -115,17 +115,28 @@ def convolve_skyglow(
 
     Each band uses a kernel built at its center latitude; bands include
     margin rows (~max_km of latitude) so glow crosses band boundaries.
+    Adjacent bands are blended in an overlap zone to eliminate seams
+    caused by abrupt kernel changes at band edges.
     """
-    height, _ = emission.shape
+    height, width = emission.shape
     pixel_deg = abs(transform.e)
     margin_rows = int(np.ceil((max_km / KM_PER_DEG) / pixel_deg))
     band_rows = max(1, round(band_deg / pixel_deg))
+    blend_rows = margin_rows // 2
 
-    out = np.empty_like(emission)
+    out = np.zeros((height, width), dtype=np.float32)
+    weights = np.zeros((height, width), dtype=np.float32)
+
     for r0 in range(0, height, band_rows):
         r1 = min(r0 + band_rows, height)
         p0 = max(0, r0 - margin_rows)
         p1 = min(height, r1 + margin_rows)
+
+        is_first_band = (r0 == 0)
+        is_last_band = (r1 >= height)
+        ext0 = r0 if is_first_band else max(p0, r0 - blend_rows)
+        ext1 = r1 if is_last_band else min(p1, r1 + blend_rows)
+
         center_lat = transform.f + transform.e * ((r0 + r1) / 2.0)
         kernel = build_kernel(pixel_deg, center_lat, d0_km, alpha, max_km)
         click.echo(
@@ -133,7 +144,22 @@ def convolve_skyglow(
             f"kernel {kernel.shape[0]}x{kernel.shape[1]}..."
         )
         conv = oaconvolve(emission[p0:p1], kernel, mode="same")
-        out[r0:r1] = conv[r0 - p0 : r1 - p0]
+        conv_slice = conv[ext0 - p0 : ext1 - p0]
+
+        n = ext1 - ext0
+        w = np.ones(n, dtype=np.float32)
+        top_taper = r0 - ext0
+        if top_taper > 0:
+            w[:top_taper] = np.linspace(0.0, 1.0, top_taper, endpoint=False, dtype=np.float32)
+        bottom_taper = ext1 - r1
+        if bottom_taper > 0:
+            w[n - bottom_taper:] = np.linspace(1.0, 0.0, bottom_taper, endpoint=False, dtype=np.float32)
+
+        w_2d = w[:, np.newaxis]
+        out[ext0:ext1] += conv_slice * w_2d
+        weights[ext0:ext1] += w_2d
+
+    out /= weights
     return out
 
 
