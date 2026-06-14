@@ -18,7 +18,7 @@ export default function LayerToggle({ layer, onChange, skyglowAvailable }: Layer
             className={`${styles.button} ${layer === l.id ? styles.active : ''}`}
             disabled={disabled}
             onClick={() => onChange(l.id)}
-            title={disabled ? 'Sky glow not available for this year' : l.label}
+            title={disabled ? 'Sky glow data not available' : l.label}
           >
             {l.label}
           </button>

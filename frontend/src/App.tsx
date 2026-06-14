@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import Map from './components/Map'
 import BortleLegend from './components/BortleLegend'
 import EmissionLegend from './components/EmissionLegend'
-import YearSelector from './components/YearSelector'
 import LayerToggle from './components/LayerToggle'
 import type { LayerId } from './lib/layers'
 import './App.css'
@@ -12,8 +11,8 @@ const DEFAULT_YEAR = 2023
 
 export default function App() {
   const [year, setYear] = useState<number>(DEFAULT_YEAR)
-  const [availableYears, setAvailableYears] = useState<number[]>([])
-  const [skyglowYears, setSkyglowYears] = useState<number[]>([])
+  const [hasData, setHasData] = useState(false)
+  const [skyglowAvailable, setSkyglowAvailable] = useState(false)
   const [layer, setLayer] = useState<LayerId>('skyglow')
   const [ready, setReady] = useState(false)
 
@@ -22,11 +21,10 @@ export default function App() {
       .then((r) => r.json())
       .then((data: { years: number[]; skyglow_years?: number[] }) => {
         if (data.years?.length) {
-          setAvailableYears(data.years)
-          setYear(data.years[data.years.length - 1])
-        }
-        if (data.skyglow_years?.length) {
-          setSkyglowYears(data.skyglow_years)
+          const latestYear = data.years[data.years.length - 1]
+          setYear(latestYear)
+          setHasData(true)
+          setSkyglowAvailable(data.skyglow_years?.includes(latestYear) ?? false)
         }
       })
       .catch(() => {
@@ -35,16 +33,13 @@ export default function App() {
       .finally(() => setReady(true))
   }, [])
 
-  const skyglowAvailable = skyglowYears.includes(year)
-
-  // Fall back to emission if current year lacks skyglow
+  // Fall back to emission if skyglow not available
   const activeLayer = layer === 'skyglow' && !skyglowAvailable ? 'emission' : layer
 
   return (
     <div className="app">
       <header className="header">
         <h1 className="title">DarkFinder</h1>
-        <YearSelector year={year} years={availableYears} onChange={setYear} />
         <LayerToggle layer={activeLayer} onChange={setLayer} skyglowAvailable={skyglowAvailable} />
         <a
           href="https://github.com/samrichards/dark-finder"
@@ -59,7 +54,7 @@ export default function App() {
         </a>
       </header>
       <div className="mapWrapper">
-        {ready && <Map year={year} layer={activeLayer} hasData={availableYears.length > 0} />}
+        {ready && <Map year={year} layer={activeLayer} hasData={hasData} />}
         {activeLayer === 'skyglow' ? <BortleLegend /> : <EmissionLegend />}
       </div>
     </div>
