@@ -73,6 +73,8 @@ def apply_bortle_colormap(band: np.ndarray, valid_mask: np.ndarray) -> np.ndarra
 
 # ── Sky-glow (lpm-style) color ramp ──────────────────────────────────────────
 
+FADE_FLOOR = 1e-3  # nW/cm²/sr — below this, fully transparent (kills FFT noise ~1e-9)
+
 SKYGLOW_ANCHORS: list[float] = [
     0.01, 0.04, 0.12, 0.35, 1.0, 3.0, 8.0, 20.0, 45.0, 100.0,
 ]
@@ -127,10 +129,12 @@ def apply_skyglow_colormap(band: np.ndarray, valid_mask: np.ndarray) -> np.ndarr
         r, g, b = SKYGLOW_COLORS[-1]
         rgba[top_mask] = (r, g, b, base_alpha)
 
-    # Below lowest anchor: fade alpha from base_alpha (at 0.01) to 0 (at ~0.001)
-    fade_mask = (band > 0) & (band < SKYGLOW_ANCHORS[0]) & valid_mask
+    # Fade alpha from 0 (at FADE_FLOOR) to base_alpha (at lowest anchor)
+    fade_mask = (band >= FADE_FLOOR) & (band < SKYGLOW_ANCHORS[0]) & valid_mask
     if np.any(fade_mask):
-        fade_t = np.clip(log_band[fade_mask] / np.log10(SKYGLOW_ANCHORS[0]), 0, 1)
+        log_floor = np.log10(FADE_FLOOR)            # -3
+        log_anchor = np.log10(SKYGLOW_ANCHORS[0])   # -2
+        fade_t = np.clip((log_band[fade_mask] - log_floor) / (log_anchor - log_floor), 0, 1)
         r0, g0, b0 = SKYGLOW_COLORS[0]
         rgba[fade_mask, 0] = r0
         rgba[fade_mask, 1] = g0
