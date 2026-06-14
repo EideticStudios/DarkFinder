@@ -160,7 +160,7 @@ def convolve_skyglow(
         out[ext0:ext1] += conv_slice * w_2d
         weights[ext0:ext1] += w_2d
 
-    out /= weights
+    np.divide(out, weights, out=out, where=weights > 0)
     return out
 
 

@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 import click
+import numpy as np
 import rasterio
 import rasterio.windows as rw
 from rasterio.enums import Resampling
@@ -21,6 +22,49 @@ from rasterio.transform import from_bounds
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 NODATA = -9999.0
+
+VIIRS_LAT_NORTH = 72.0   # ~3° buffer inside 75°N coverage limit
+VIIRS_LAT_SOUTH = -63.0  # ~2° buffer inside 65°S coverage limit
+
+
+# ── Polar masking ─────────────────────────────────────────────────────────────
+
+def mask_polar_rows(path: Path) -> None:
+    """Set pixels outside VIIRS clean-data latitudes to NODATA."""
+    with rasterio.open(path, "r+") as ds:
+        transform = ds.transform
+        nodata = ds.nodata if ds.nodata is not None else NODATA
+
+        # Scan from top to find first valid row
+        north_cutoff = 0
+        for row in range(ds.height):
+            lat = transform.f + transform.e * (row + 0.5)
+            if lat > VIIRS_LAT_NORTH:
+                north_cutoff = row + 1
+            else:
+                break
+
+        # Scan from bottom to find last valid row
+        south_cutoff = ds.height
+        for row in range(ds.height - 1, -1, -1):
+            lat = transform.f + transform.e * (row + 0.5)
+            if lat < VIIRS_LAT_SOUTH:
+                south_cutoff = row
+            else:
+                break
+
+        if north_cutoff > 0:
+            win = rw.Window(0, 0, ds.width, north_cutoff)
+            data = np.full((north_cutoff, ds.width), nodata, dtype=np.float32)
+            ds.write(data, 1, window=win)
+            click.echo(f"  Masked {north_cutoff} polar rows at top (>{VIIRS_LAT_NORTH}°N)")
+
+        remaining = ds.height - south_cutoff
+        if remaining > 0:
+            win = rw.Window(0, south_cutoff, ds.width, remaining)
+            data = np.full((remaining, ds.width), nodata, dtype=np.float32)
+            ds.write(data, 1, window=win)
+            click.echo(f"  Masked {remaining} polar rows at bottom (<{VIIRS_LAT_SOUTH}°S)")
 
 
 # ── Source discovery ───────────────────────────────────────────────────────────
@@ -227,6 +271,10 @@ def main(year: int, skip_validate: bool) -> None:
         need_cleanup = True
         stream_mosaic(sources, work_path)
         click.echo(f"  Mosaic complete -> {work_path}")
+
+    # ── Mask polar artifacts ──────────────────────────────────────────────────
+    click.echo("\nMasking polar latitude artifacts...")
+    mask_polar_rows(work_path)
 
     # ── Build overviews ────────────────────────────────────────────────────────
     click.echo("\nBuilding overviews (may take several minutes on large files)...")
