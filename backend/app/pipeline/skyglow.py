@@ -2,7 +2,7 @@
 Compute a modeled sky-glow layer from a processed VIIRS emission COG.
 
 Upward emission only shows where light is produced. Sky glow propagates
-~200 km from sources, so this step convolves the emission raster with a
+~100 km from sources, so this step convolves the emission raster with a
 Falchi/Garstang-style distance-falloff kernel: w(d) = (1 + d/d0)^-alpha,
 truncated at max_distance. The kernel is normalized to sum=1, so output
 values are a weighted average of nearby radiance and stay on the same
@@ -14,7 +14,7 @@ kernel at each band's center latitude so km-per-pixel in longitude
 to 0.1 to prevent kernel explosion.
 
 Known limitation: `mode="same"` zero-pads at the raster borders, so glow
-is underestimated within ~200 km of the edges. For global data this
+is underestimated within ~120 km of the edges. For global data this
 affects only the dateline (open Pacific Ocean) — negligible visual impact.
 
 Input:  data/processed/{year}_cog.tif
@@ -80,9 +80,9 @@ def downsample_emission(src_path: Path, factor: int = 4) -> tuple[np.ndarray, Af
 def build_kernel(
     pixel_deg: float,
     center_lat_deg: float,
-    d0_km: float = 4.0,
-    alpha: float = 2.5,
-    max_km: float = 200.0,
+    d0_km: float = 2.5,
+    alpha: float = 2.8,
+    max_km: float = 120.0,
 ) -> np.ndarray:
     """
     Distance-falloff kernel w(d) = (1 + d/d0)^-alpha, truncated at max_km,
@@ -106,9 +106,9 @@ def build_kernel(
 def convolve_skyglow(
     emission: np.ndarray,
     transform: Affine,
-    d0_km: float = 4.0,
-    alpha: float = 2.5,
-    max_km: float = 200.0,
+    d0_km: float = 2.5,
+    alpha: float = 2.8,
+    max_km: float = 120.0,
     band_deg: float = 10.0,
 ) -> np.ndarray:
     """
@@ -212,9 +212,9 @@ def print_percentiles(arr: np.ndarray) -> None:
 @click.command()
 @click.option("--year", required=True, type=int, help="Year to process (e.g. 2023)")
 @click.option("--factor", default=4, type=int, help="Downsample factor before convolution")
-@click.option("--d0", default=4.0, type=float, help="Kernel falloff scale distance (km)")
-@click.option("--alpha", default=2.5, type=float, help="Kernel falloff exponent")
-@click.option("--max-distance", default=200.0, type=float, help="Kernel truncation distance (km)")
+@click.option("--d0", default=2.5, type=float, help="Kernel falloff scale distance (km)")
+@click.option("--alpha", default=2.8, type=float, help="Kernel falloff exponent")
+@click.option("--max-distance", default=120.0, type=float, help="Kernel truncation distance (km)")
 def main(year: int, factor: int, d0: float, alpha: float, max_distance: float) -> None:
     """Convolve a year's emission COG into a modeled sky-glow COG."""
     src_cog = DATA_DIR / "processed" / f"{year}_cog.tif"

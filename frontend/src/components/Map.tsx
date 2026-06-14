@@ -13,7 +13,7 @@ const GIBS_TILES = [
   'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png',
 ]
 
-const TILE_VERSION = 6
+const TILE_VERSION = 7
 
 function tileUrl(layer: LayerId, year: number): string {
   return `${API_BASE}/tiles/${layer}/${year}/{z}/{x}/{y}.png?v=${TILE_VERSION}`
