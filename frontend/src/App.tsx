@@ -3,11 +3,14 @@ import Map from './components/Map'
 import BortleLegend from './components/BortleLegend'
 import EmissionLegend from './components/EmissionLegend'
 import LayerToggle from './components/LayerToggle'
+import IntroModal from './components/IntroModal'
+import Footer from './components/Footer'
 import type { LayerId } from './lib/layers'
 import './App.css'
 
 const API_BASE = 'http://localhost:8000/api/v1'
 const DEFAULT_YEAR = 2023
+const INTRO_SEEN_KEY = 'darkfinder-intro-seen'
 
 export default function App() {
   const [year, setYear] = useState<number>(DEFAULT_YEAR)
@@ -15,6 +18,18 @@ export default function App() {
   const [skyglowAvailable, setSkyglowAvailable] = useState(false)
   const [layer, setLayer] = useState<LayerId>('skyglow')
   const [ready, setReady] = useState(false)
+  const [showIntro, setShowIntro] = useState(false)
+
+  useEffect(() => {
+    if (!localStorage.getItem(INTRO_SEEN_KEY)) {
+      setShowIntro(true)
+    }
+  }, [])
+
+  const handleCloseIntro = () => {
+    setShowIntro(false)
+    localStorage.setItem(INTRO_SEEN_KEY, '1')
+  }
 
   useEffect(() => {
     fetch(`${API_BASE}/years`)
@@ -56,7 +71,9 @@ export default function App() {
       <div className="mapWrapper">
         {ready && <Map year={year} layer={activeLayer} hasData={hasData} />}
         {activeLayer === 'skyglow' ? <BortleLegend /> : <EmissionLegend />}
+        <Footer />
       </div>
+      {showIntro && <IntroModal onClose={handleCloseIntro} />}
     </div>
   )
 }
