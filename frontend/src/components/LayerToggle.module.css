@@ -1,7 +1,7 @@
 .wrapper {
   display: flex;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -10,8 +10,8 @@
   background: rgba(255, 255, 255, 0.06);
   border: none;
   color: #9ca3af;
-  font-size: 12px;
-  padding: 4px 12px;
+  font-size: 15px;
+  padding: 8px 18px;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
   white-space: nowrap;

@@ -6,6 +6,6 @@ export interface LayerInfo {
 }
 
 export const LAYERS: LayerInfo[] = [
-  { id: 'emission', label: 'Emission' },
   { id: 'skyglow', label: 'Sky Glow' },
+  { id: 'emission', label: 'Emission' },
 ]
