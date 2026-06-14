@@ -146,6 +146,6 @@ make dev-backend
 - Never commit anything in `backend/data/` or `backend/tiles/` — these are gitignored and can be multiple GB.
 - The VIIRS GeoTIFFs are large (hundreds of MB to several GB). Pipeline scripts should be resumable.
 - MapLibre GL JS uses `maplibre-gl` on npm, not `mapbox-gl`. They are API-compatible but the package name matters.
-- The Carto Dark Matter basemap URL is: `https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png` (no API key needed, subject to fair use terms).
+- The Carto Dark Matter basemap uses split tiles so labels render above the VIIRS overlay: `dark_nolabels` (bottom), VIIRS overlay (middle), `dark_only_labels` (top). URLs: `https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png` and `https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png` (no API key needed, subject to fair use terms).
 - Python virtual environment should be in `backend/.venv/` (gitignored).
 - Use `uv` for Python package management if available, otherwise `pip`.

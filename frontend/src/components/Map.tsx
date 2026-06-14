@@ -4,7 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { LayerId } from '../lib/layers'
 import styles from './Map.module.css'
 
-const CARTO_DARK_TILES = ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png']
+const CARTO_DARK_BASE_TILES = ['https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png']
+const CARTO_DARK_LABEL_TILES = ['https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png']
 const API_BASE = 'http://localhost:8000/api/v1'
 
 // Fallback: NASA GIBS pre-rendered Black Marble tiles (no backend required)
@@ -42,9 +43,9 @@ export default function Map({ year, layer, hasData }: MapProps) {
       style: {
         version: 8,
         sources: {
-          'carto-dark': {
+          'carto-dark-base': {
             type: 'raster',
-            tiles: CARTO_DARK_TILES,
+            tiles: CARTO_DARK_BASE_TILES,
             tileSize: 256,
             attribution:
               '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -56,15 +57,21 @@ export default function Map({ year, layer, hasData }: MapProps) {
             maxzoom: hasData ? 13 : 8,
             attribution: 'NASA Black Marble VIIRS &copy; NASA / EOG',
           },
+          'carto-dark-labels': {
+            type: 'raster',
+            tiles: CARTO_DARK_LABEL_TILES,
+            tileSize: 256,
+          },
         },
         layers: [
-          { id: 'carto-dark', type: 'raster', source: 'carto-dark' },
+          { id: 'carto-dark-base', type: 'raster', source: 'carto-dark-base' },
           {
             id: 'viirs-overlay',
             type: 'raster',
             source: 'viirs',
             paint: { 'raster-opacity': layer === 'skyglow' ? 0.78 : 0.85 },
           },
+          { id: 'carto-dark-labels', type: 'raster', source: 'carto-dark-labels' },
         ],
       },
       center: [-95, 38],
