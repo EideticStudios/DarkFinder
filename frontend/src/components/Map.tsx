@@ -2,11 +2,11 @@ import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { LayerId } from '../lib/layers'
+import { API_BASE } from '../lib/api'
 import styles from './Map.module.css'
 
 const CARTO_DARK_BASE_TILES = ['https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png']
 const CARTO_DARK_LABEL_TILES = ['https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png']
-const API_BASE = 'http://localhost:8000/api/v1'
 
 // Fallback: NASA GIBS pre-rendered Black Marble tiles (no backend required)
 const GIBS_TILES = [

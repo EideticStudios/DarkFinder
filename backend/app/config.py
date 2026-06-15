@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 # Absolute path to backend/data/
@@ -7,7 +8,12 @@ PROCESSED_DIR = DATA_DIR / "processed"
 
 API_PREFIX = "/api/v1"
 
-FRONTEND_ORIGIN = "http://localhost:5173"
+# Comma-separated list of allowed CORS origins; defaults to the local dev frontend.
+FRONTEND_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("FRONTEND_ORIGINS", "http://localhost:5173").split(",")
+    if o.strip()
+]
 
 
 def latest_emission_cog() -> Path | None:

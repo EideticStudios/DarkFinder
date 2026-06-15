@@ -7,9 +7,9 @@ import IntroModal from './components/IntroModal'
 import AboutModal from './components/AboutModal'
 import Footer from './components/Footer'
 import type { LayerId } from './lib/layers'
+import { API_BASE } from './lib/api'
 import './App.css'
 
-const API_BASE = 'http://localhost:8000/api/v1'
 const INTRO_SEEN_KEY = 'darkfinder-intro-seen'
 
 export default function App() {
