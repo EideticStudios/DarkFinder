@@ -111,7 +111,7 @@ def main(year: int) -> None:
             click.echo(f"  Mean radiance:  {valid.mean():.4f} nW/cm2/sr")
 
     # City spot-check
-    click.echo(f"\n--- City spot-check ---")
+    click.echo("\n--- City spot-check ---")
     click.echo(f"{'City':<16}  {'Value':>12}  {'Status'}")
     click.echo("-" * 50)
 

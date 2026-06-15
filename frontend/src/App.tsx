@@ -19,14 +19,8 @@ export default function App() {
   const [skyglowAvailable, setSkyglowAvailable] = useState(false)
   const [layer, setLayer] = useState<LayerId>('skyglow')
   const [ready, setReady] = useState(false)
-  const [showIntro, setShowIntro] = useState(false)
+  const [showIntro, setShowIntro] = useState(() => !localStorage.getItem(INTRO_SEEN_KEY))
   const [showAbout, setShowAbout] = useState(false)
-
-  useEffect(() => {
-    if (!localStorage.getItem(INTRO_SEEN_KEY)) {
-      setShowIntro(true)
-    }
-  }, [])
 
   const handleCloseIntro = () => {
     setShowIntro(false)

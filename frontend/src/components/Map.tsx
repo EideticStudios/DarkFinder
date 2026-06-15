@@ -31,8 +31,10 @@ export default function Map({ year, layer, hasData }: MapProps) {
   // Refs to avoid stale closures in the click handler
   const yearRef = useRef(year)
   const layerRef = useRef(layer)
-  yearRef.current = year
-  layerRef.current = layer
+  useEffect(() => {
+    yearRef.current = year
+    layerRef.current = layer
+  }, [year, layer])
 
   // Initialize map once — hasData is already resolved before this mounts
   useEffect(() => {
