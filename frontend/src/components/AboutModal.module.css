@@ -1,0 +1,220 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 2, 6, 0.62);
+  backdrop-filter: blur(5px);
+  animation: fade 0.35s ease both;
+}
+
+.modal {
+  position: relative;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  padding: 48px 56px 44px;
+  text-align: left;
+  background: rgba(10, 10, 15, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Soft celestial sky-glow bleeding in from the top of the card */
+.glow {
+  position: absolute;
+  top: -140px;
+  left: 50%;
+  width: 460px;
+  height: 320px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(80, 130, 255, 0.28),
+    rgba(80, 130, 255, 0) 70%
+  );
+  pointer-events: none;
+}
+
+.closeButton {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.closeButton:hover {
+  color: #f2f4f8;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid rgba(160, 185, 255, 0.9);
+  outline-offset: 2px;
+}
+
+.title {
+  position: relative;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: #f2f4f8;
+  text-shadow: 0 0 24px rgba(120, 160, 255, 0.35);
+}
+
+.subtitle {
+  position: relative;
+  margin-top: 10px;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: #9ca3af;
+}
+
+.section {
+  position: relative;
+  margin-top: 32px;
+}
+
+.sectionTitle {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #e6e9f0;
+}
+
+.text {
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 1.7;
+  color: #c4c9d2;
+}
+
+.text code {
+  padding: 1px 5px;
+  font-size: 14px;
+  color: #dfe3ea;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+}
+
+.text strong {
+  color: #e6e9f0;
+  font-weight: 600;
+}
+
+.scale {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  list-style: none;
+}
+
+.scaleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.swatch {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.scaleLabel {
+  font-size: 14px;
+  color: #c4c9d2;
+}
+
+.scaleLabel strong {
+  color: #e6e9f0;
+  font-weight: 600;
+}
+
+.githubLink {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 36px;
+  padding: 11px 18px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #c4c9d2;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.githubLink:hover {
+  color: #f2f4f8;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.githubLink:focus-visible {
+  outline: 2px solid rgba(160, 185, 255, 0.9);
+  outline-offset: 2px;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 600px) {
+  .modal {
+    padding: 40px 28px 36px;
+  }
+
+  .scale {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .modal {
+    animation: none;
+  }
+}

@@ -13,7 +13,7 @@ export default function BortleLegend() {
           </div>
         ))}
       </div>
-      <p className={styles.attribution}>NASA Black Marble VIIRS · 2016</p>
+      <p className={styles.attribution}>VIIRS VNL V2.2 · 2023</p>
     </div>
   )
 }

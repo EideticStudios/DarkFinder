@@ -24,22 +24,29 @@
   color: #e0e0e0;
 }
 
-.githubLink {
+.aboutButton {
   display: flex;
   align-items: center;
   gap: 6px;
+  font: inherit;
   font-size: 15px;
   color: #9ca3af;
-  text-decoration: none;
+  background: none;
+  cursor: pointer;
   padding: 8px 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   transition: color 0.2s, border-color 0.2s;
 }
 
-.githubLink:hover {
+.aboutButton:hover {
   color: #e0e0e0;
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+.aboutButton:focus-visible {
+  outline: 2px solid rgba(160, 185, 255, 0.9);
+  outline-offset: 2px;
 }
 
 .mapWrapper {
