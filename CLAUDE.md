@@ -9,7 +9,7 @@ The project is structured as a monorepo with two packages: `frontend/` and `back
 ## Architecture
 
 ```
-dark-finder/
+DarkFinder/
 ├── frontend/          # React + TypeScript + Vite
 │   ├── src/
 │   │   ├── components/    # React components

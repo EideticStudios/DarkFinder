@@ -43,8 +43,8 @@ This opens a browser for Google account authorization. No credentials in `.env` 
 ## 1. Clone the Repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/dark-finder.git
-cd dark-finder
+git clone https://github.com/YOUR_USERNAME/DarkFinder.git
+cd DarkFinder
 ```
 
 ## 2. Set Up the Frontend
@@ -142,7 +142,7 @@ Once setup is complete, your development workflow is:
 ## Folder Reference
 
 ```
-dark-finder/
+DarkFinder/
 ├── CLAUDE.md              <- Claude Code context file
 ├── README.md              <- Public-facing project README
 ├── LICENSE                <- MIT license

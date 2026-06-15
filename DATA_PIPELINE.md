@@ -17,17 +17,25 @@ NOAA/VIIRS/DNB/ANNUAL_V22
 
 **Authentication:**
 ```bash
-# One-time setup — opens a browser for Google account auth
-earthengine authenticate
+# One-time setup — opens a browser for Google account auth.
+# The earthengine CLI lives in the backend venv, so run it via the Make target:
+make auth        # = cd backend && .venv/bin/earthengine authenticate
 ```
 
-No `.env` credentials are needed. GEE auth tokens are stored locally by the `earthengine` CLI.
+Auth tokens are stored locally by the `earthengine` CLI. In addition, the download step
+needs a Google Cloud project with the Earth Engine API enabled — set its ID in
+`backend/.env`, or the download exits with `GEE_PROJECT not set`:
+
+```bash
+cp backend/.env.example backend/.env
+# then set GEE_PROJECT=your-gcp-project-id
+```
 
 **File properties (after download):**
 - Format: GeoTIFF, single-band float32
 - CRS: EPSG:4326 (geographic lat/lon)
-- Resolution: 15 arc-seconds (~450m at equator)
-- Extent: depends on --bbox flag (default: North America; use --global for full coverage)
+- Resolution: 15 arc-seconds (~464 m at equator; downloaded at 463.83 m native scale)
+- Extent: global when built via `make` (the `download` target passes `--global`); the bare `download` script's `--bbox` defaults to a North America box
 - No-data value: -9999.0
 - Values: radiance in nW/cm2/sr
 - Size: varies by region (North America ~500MB, global ~2-3 GB)
@@ -37,30 +45,35 @@ No `.env` credentials are needed. GEE auth tokens are stored locally by the `ear
 ### Step 1: Download from GEE
 
 ```bash
-# North America (default bbox)
-make download YEAR=2023
+# Global coverage — make download defaults to --global
+make download
 
-# Custom bounding box
-make download YEAR=2023 BBOX="-130,24,-60,50"
+# Limit to a bounding box
+make download BBOX="-130,24,-60,50"
 
-# Or directly:
+# Or directly (the bare script's --bbox defaults to a North America box):
 cd backend
-python -m app.pipeline.download --year 2023
-python -m app.pipeline.download --year 2023 --global
+.venv/bin/python -m app.pipeline.download            # North America box
+.venv/bin/python -m app.pipeline.download --global   # full globe
 ```
+
+`YEAR` defaults to 2023 everywhere; pass `YEAR=2022` (or `--year 2022`) to target another year.
 
 The download script uses `geemap.download_ee_image()` which automatically tiles large regions. Data arrives already in EPSG:4326 — no reprojection needed.
 
 Output: `data/raw/{year}/VNL_V22_{year}_average_masked.tif`
 
-### Step 2: Process to COG
+### Step 2: Mosaic to an emission COG
+
+`make process` runs two sub-steps in sequence: the mosaic below, then the Sky Glow
+convolution (Step 3). To build only the emission COG, call the mosaic module directly:
 
 ```bash
-make process YEAR=2023
+make process                     # mosaic + sky glow
 
-# Or directly:
+# Or just the emission COG:
 cd backend
-python -m app.pipeline.mosaic --year 2023
+.venv/bin/python -m app.pipeline.mosaic
 ```
 
 This step:
@@ -77,72 +90,55 @@ Output: `data/processed/{year}_cog.tif` — single-band float32, EPSG:4326, inte
 - `PREDICTOR=3` is the floating-point predictor for DEFLATE. It significantly improves compression on float32 data.
 - Verify the output: `rio cogeo validate data/processed/2023_cog.tif` (requires `rio-cogeo` package).
 
-### Step 3: Tile Serving
+### Step 3: Sky Glow COG
 
-There is no separate tiling step. Tiles are rendered on-the-fly by rio-tiler reading the COG. The color ramp logic lives in `app/services/tile_renderer.py` and is applied per-tile at request time.
+The emission COG only shows where light is produced. The Sky Glow layer models where that
+light ends up by propagating each source outward ~100 km. `app/pipeline/skyglow.py`
+convolves the emission raster with a Falchi/Garstang distance-falloff kernel
+`w(d) = (1 + d/d0)^-alpha` (defaults: `d0` = 2.5 km, `alpha` = 2.8), truncated at 120 km
+and normalized to sum = 1, so the output stays in the same nW/cm²/sr units as the input.
 
-```python
-import io
-import numpy as np
-from PIL import Image
-from rio_tiler.io import Reader
-from rio_tiler.errors import TileOutsideBounds
-
-BREAKPOINTS = [0.0, 0.2, 0.4, 1.0, 3.0, 6.0, 12.0, 30.0, 60.0]
-# (R, G, B, A) — alpha 200 for most classes, 220 for the bright end
-COLORS = [
-    (0x00, 0x00, 0x11, 200),  # Bortle 1: pristine
-    (0x00, 0x00, 0x33, 200),  # Bortle 2: dark site
-    (0x00, 0x33, 0x66, 200),  # Bortle 3: rural
-    (0x00, 0x66, 0x33, 200),  # Bortle 4: rural/suburban
-    (0x33, 0x99, 0x00, 200),  # Bortle 5: suburban
-    (0xCC, 0xCC, 0x00, 200),  # Bortle 6: bright suburban
-    (0xFF, 0x66, 0x00, 200),  # Bortle 7: suburban/urban
-    (0xCC, 0x00, 0x00, 220),  # Bortle 8: city
-    (0xFF, 0xFF, 0xFF, 220),  # Bortle 9: inner city
-]
-
-def render_tile(cog_path: str, x: int, y: int, z: int) -> bytes | None:
-    """Read a COG window and apply the Bortle color ramp. Returns PNG bytes, or None if out of bounds."""
-    try:
-        with Reader(cog_path) as src:
-            img = src.tile(x, y, z, resampling_method="bilinear")
-    except TileOutsideBounds:
-        return None
-
-    band = img.data[0].astype(np.float32)
-    h, w = band.shape
-    rgba = np.zeros((4, h, w), dtype=np.uint8)
-
-    for i in range(len(BREAKPOINTS) - 1):
-        lo, hi = BREAKPOINTS[i], BREAKPOINTS[i + 1]
-        mask = (band >= lo) & (band < hi)
-        if not np.any(mask):
-            continue
-        t = (band[mask] - lo) / (hi - lo)
-        r0, g0, b0, a0 = COLORS[i]
-        r1, g1, b1, a1 = COLORS[i + 1]
-        rgba[0][mask] = np.clip(r0 + t * (r1 - r0), 0, 255).astype(np.uint8)
-        rgba[1][mask] = np.clip(g0 + t * (g1 - g0), 0, 255).astype(np.uint8)
-        rgba[2][mask] = np.clip(b0 + t * (b1 - b0), 0, 255).astype(np.uint8)
-        rgba[3][mask] = np.clip(a0 + t * (a1 - a0), 0, 255).astype(np.uint8)
-
-    mask = band >= BREAKPOINTS[-1]
-    rgba[0][mask], rgba[1][mask], rgba[2][mask], rgba[3][mask] = COLORS[-1]
-
-    # Transparent where no light detected
-    rgba[3][(band <= 0) | np.isnan(band)] = 0
-
-    out = Image.fromarray(rgba.transpose(1, 2, 0), mode="RGBA")
-    buf = io.BytesIO()
-    out.save(buf, format="PNG")
-    return buf.getvalue()
+```bash
+make process                     # runs this right after the mosaic
+# Or directly:
+cd backend
+.venv/bin/python -m app.pipeline.skyglow
 ```
 
+Implementation notes:
+- The emission raster is block-averaged (default 4x) before convolution, read in row
+  chunks so the full ~2 GB array is never held in memory.
+- The convolution (SciPy `oaconvolve`, FFT-based) runs in ~10° latitude bands, rebuilding
+  the kernel at each band's center latitude so longitude km-per-pixel (`cos(lat)`) stays
+  correct; near the poles `cos(lat)` is clamped to 0.1. Adjacent bands are blended to avoid
+  seams.
+
+Output: `data/processed/{year}_skyglow_cog.tif` — same grid and format as the emission COG.
+
+### Step 4: Tile Serving
+
+There is no separate tiling step. Tiles are rendered on the fly by rio-tiler reading the
+COG, with the color ramp applied per tile at request time. The endpoint is
+`GET /api/v1/tiles/{layer}/{z}/{x}/{y}.png`, where `layer` is `emission` or `skyglow`; the
+backend auto-discovers the newest processed COG for that layer (`app/config.py`). All the
+rendering logic lives in `app/services/tile_renderer.py`.
+
+Both layers share one 9-stop vivid palette (`RAMP_COLORS`, Bortle classes 1–9, magenta at
+the bright end) so the map and the frontend legend (`frontend/src/lib/bortleScale.ts`)
+always agree. They differ only in how values map onto that palette:
+
+- **Emission** — linear interpolation between fixed radiance breakpoints
+  `[0.0, 0.2, 0.4, 1.0, 3.0, 6.0, 12.0, 30.0, 60.0]` (nW/cm²/sr).
+- **Sky Glow** — log10 interpolation between anchors tuned to the post-convolution
+  distribution; values below the lowest anchor fade to transparent so pristine areas reveal
+  the dark basemap.
+
 **Gotchas:**
-- The alpha channel matters. Zero-radiance pixels MUST be fully transparent so the dark basemap shows through. Without this, the entire map turns opaque.
-- Consider a logarithmic mapping: apply `np.log10(band + 1)` before the breakpoint lookup and adjust breakpoints accordingly. Human perception of brightness is logarithmic, and it often looks better.
-- The color ramp in CLAUDE.md is a starting point. Tune it by comparing against lightpollutionmap.info's rendering and real SQM measurement data.
+- The alpha channel matters. Zero-radiance / nodata pixels MUST be fully transparent so the
+  dark basemap shows through. Without this, the entire map turns opaque.
+- `tile_renderer.py` is the single source of truth for the breakpoints and palette — keep
+  the frontend legend (`bortleScale.ts`) and the color-ramp table in `CLAUDE.md` in sync
+  with it, and tune against real SQM measurement data.
 - Cache rendered tiles at the HTTP layer (`Cache-Control: public, max-age=31536000, immutable`). The data is annual and immutable once processed.
 - The COG can be read directly from remote storage (e.g. Cloudflare R2) by passing a `/vsicurl/https://...` path to rio-tiler. GDAL's range-request support means only the needed tile window is fetched over the network.
 
@@ -154,7 +150,7 @@ These are approximate conversions. The relationship between satellite-measured r
 ```
 SQM ~ 22.0 - 2.5 * log10(radiance / 0.171 + 1)
 ```
-This is a rough formula. The actual lightpollutionmap.info uses a more sophisticated sky brightness model (convolving radiance with atmospheric scattering kernels and elevation data). For a v1, the rough formula is fine.
+This is a rough point conversion. A fuller treatment convolves radiance with atmospheric scattering kernels (and ideally elevation data) — which is essentially what the Sky Glow layer (Step 3) does. The radiance endpoint reflects this: it samples the sky-glow COG for the SQM estimate when one is available, falling back to raw emission otherwise. Bortle class is computed directly from the radiance breakpoints above, not via SQM.
 
 **SQM -> Bortle class:**
 | SQM Range          | Bortle |
@@ -173,4 +169,4 @@ This is a rough formula. The actual lightpollutionmap.info uses a more sophistic
 - A full global raster at 15 arc-second resolution is approximately 86400 x 33600 pixels. At float32, that's ~11 GB uncompressed; with DEFLATE + float predictor the COG compresses to ~3-5 GB.
 - The download + COG pipeline for one year takes roughly 15-60 minutes depending on region size and internet speed. There is no slow tile-generation step.
 - rio-tiler renders a single 256x256 tile from a COG in ~5-50ms depending on zoom level and whether GDAL's block cache is warm.
-- For an initial setup, processing just 2023 and one comparison year (e.g., 2015) is sufficient to demonstrate the pipeline and year-comparison capability.
+- The app serves a single year (2023 by default). The pipeline stays year-parameterized only so you can rebuild against a newer composite later; the serving layer always picks up the newest processed COG.

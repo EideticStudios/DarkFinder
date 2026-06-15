@@ -7,7 +7,7 @@ type AboutModalProps = {
   onClose: () => void
 }
 
-const GITHUB_URL = 'https://github.com/samrichards/dark-finder'
+const GITHUB_URL = 'https://github.com/EideticStudios/DarkFinder'
 
 // Reference links, attached to each term the first time it appears in the copy.
 const LINKS = {
