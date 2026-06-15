@@ -85,10 +85,12 @@ dark-finder/
 
 ### API Design
 - All API routes prefixed with `/api/v1/`
-- Tile endpoint: `GET /api/v1/tiles/{year}/{z}/{x}/{y}.png`
-- Radiance query: `GET /api/v1/radiance?lat={lat}&lng={lng}&year={year}`
+- Tile endpoint: `GET /api/v1/tiles/{layer}/{z}/{x}/{y}.png` (`layer` is `emission` or `skyglow`)
+- Radiance query: `GET /api/v1/radiance?lat={lat}&lng={lng}`
+- Available layers: `GET /api/v1/layers` (which COGs are present, for frontend bootstrap)
 - Health check: `GET /api/v1/health`
 - CORS enabled for local dev (frontend on :5173, backend on :8000)
+- The serving layer is single-year: it auto-discovers the newest processed COG. Year is only a pipeline/build concept.
 
 ### Git
 - Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, `pipeline:`
@@ -122,8 +124,9 @@ Download VIIRS data from GEE, process into a COG, serve tiles on-the-fly from Fa
 # One-time GEE auth
 earthengine authenticate
 
-# Download + process
-make pipeline YEAR=2023
+# Download + process (YEAR is optional, defaults to 2023)
+make pipeline
+make pipeline YEAR=2022   # target a different year
 
 # Or step by step:
 make download YEAR=2023

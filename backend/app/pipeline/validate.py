@@ -51,7 +51,7 @@ def sample_point(ds, lat: float, lon: float) -> float | None:
 
 
 @click.command()
-@click.option("--year", required=True, type=int)
+@click.option("--year", default=2023, show_default=True, type=int)
 def main(year: int) -> None:
     """Validate GEE-downloaded VIIRS GeoTIFFs for a given year."""
     raw_dir = DATA_DIR / "raw" / str(year)

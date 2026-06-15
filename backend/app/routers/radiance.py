@@ -4,7 +4,7 @@ import rasterio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.config import PROCESSED_DIR
+from app.config import latest_emission_cog, latest_skyglow_cog
 
 router = APIRouter()
 
@@ -30,15 +30,14 @@ class RadianceResponse(BaseModel):
     radiance: float
     bortle: int
     sqm: float
-    year: int
     skyglow: float | None = None
 
 
 @router.get("/radiance", response_model=RadianceResponse)
-def get_radiance(lat: float, lng: float, year: int) -> RadianceResponse:
-    cog_path = PROCESSED_DIR / f"{year}_cog.tif"
-    if not cog_path.exists():
-        raise HTTPException(status_code=404, detail=f"No processed data for year {year}")
+def get_radiance(lat: float, lng: float) -> RadianceResponse:
+    cog_path = latest_emission_cog()
+    if cog_path is None or not cog_path.exists():
+        raise HTTPException(status_code=404, detail="No processed data available")
 
     if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
         raise HTTPException(status_code=422, detail="lat/lng out of range")
@@ -57,8 +56,8 @@ def get_radiance(lat: float, lng: float, year: int) -> RadianceResponse:
 
     # Sample sky-glow COG if available
     skyglow_val: float | None = None
-    skyglow_path = PROCESSED_DIR / f"{year}_skyglow_cog.tif"
-    if skyglow_path.exists():
+    skyglow_path = latest_skyglow_cog()
+    if skyglow_path is not None and skyglow_path.exists():
         try:
             from rasterio.warp import transform as rio_transform
             with rasterio.open(skyglow_path) as ds:
@@ -76,6 +75,5 @@ def get_radiance(lat: float, lng: float, year: int) -> RadianceResponse:
         radiance=round(radiance, 4),
         bortle=_radiance_to_bortle(radiance),
         sqm=_radiance_to_sqm(sqm_source),
-        year=year,
         skyglow=skyglow_val,
     )

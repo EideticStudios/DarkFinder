@@ -65,7 +65,7 @@ reprojects and repackages into a [Cloud-Optimized GeoTIFF](https://www.cogeo.org
 with internal tiling and overviews, so any zoom level can be served from a few HTTP
 byte-range reads rather than loading the full multi-gigabyte raster.
 
-Tiles are rendered on demand. An endpoint (`/tiles/{year}/{z}/{x}/{y}.png`) uses
+Tiles are rendered on demand. An endpoint (`/tiles/{layer}/{z}/{x}/{y}.png`) uses
 [rio-tiler](https://cogeotiff.github.io/rio-tiler/) to read the matching window from the
 COG, applies the Bortle color ramp, and returns a PNG. The Sky Glow layer is the one heavy
 computation, so it's precomputed offline by convolving the emission raster with a
@@ -104,8 +104,11 @@ and Sky Glow tiles:
 
 ```bash
 earthengine authenticate          # one-time, opens a browser
-make pipeline YEAR=2023           # download + process (mosaic + skyglow)
+make pipeline                     # download + process (mosaic + skyglow), defaults to 2023
 ```
+
+`YEAR` is optional and defaults to 2023; pass `make pipeline YEAR=2022` to target a
+different year.
 
 ### Run
 

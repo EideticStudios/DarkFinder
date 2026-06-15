@@ -10,11 +10,9 @@ import type { LayerId } from './lib/layers'
 import './App.css'
 
 const API_BASE = 'http://localhost:8000/api/v1'
-const DEFAULT_YEAR = 2023
 const INTRO_SEEN_KEY = 'darkfinder-intro-seen'
 
 export default function App() {
-  const [year, setYear] = useState<number>(DEFAULT_YEAR)
   const [hasData, setHasData] = useState(false)
   const [skyglowAvailable, setSkyglowAvailable] = useState(false)
   const [layer, setLayer] = useState<LayerId>('skyglow')
@@ -28,14 +26,12 @@ export default function App() {
   }
 
   useEffect(() => {
-    fetch(`${API_BASE}/years`)
+    fetch(`${API_BASE}/layers`)
       .then((r) => r.json())
-      .then((data: { years: number[]; skyglow_years?: number[] }) => {
-        if (data.years?.length) {
-          const latestYear = data.years[data.years.length - 1]
-          setYear(latestYear)
+      .then((data: { emission: boolean; skyglow: boolean }) => {
+        if (data.emission) {
           setHasData(true)
-          setSkyglowAvailable(data.skyglow_years?.includes(latestYear) ?? false)
+          setSkyglowAvailable(data.skyglow)
         }
       })
       .catch(() => {
@@ -57,7 +53,7 @@ export default function App() {
         </button>
       </header>
       <div className="mapWrapper">
-        {ready && <Map year={year} layer={activeLayer} hasData={hasData} />}
+        {ready && <Map layer={activeLayer} hasData={hasData} />}
         {activeLayer === 'skyglow' ? <BortleLegend /> : <EmissionLegend />}
         <Footer />
       </div>

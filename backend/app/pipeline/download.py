@@ -37,7 +37,7 @@ NODATA = -9999.0
 
 
 @click.command()
-@click.option("--year", required=True, type=int, help="Year to download (e.g. 2023)")
+@click.option("--year", default=2023, show_default=True, type=int, help="Year to download")
 @click.option(
     "--bbox", default="-170,5,-40,75",
     metavar="MIN_LON,MIN_LAT,MAX_LON,MAX_LAT",

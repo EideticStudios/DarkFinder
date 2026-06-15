@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import API_PREFIX, FRONTEND_ORIGIN
-from app.routers import radiance, tiles, years
+from app.routers import layers, radiance, tiles
 
 app = FastAPI(title="DarkFinder API", version="0.1.0")
 
@@ -15,7 +15,7 @@ app.add_middleware(
 
 app.include_router(tiles.router, prefix=API_PREFIX)
 app.include_router(radiance.router, prefix=API_PREFIX)
-app.include_router(years.router, prefix=API_PREFIX)
+app.include_router(layers.router, prefix=API_PREFIX)
 
 
 @app.get(f"{API_PREFIX}/health")

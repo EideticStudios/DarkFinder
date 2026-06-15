@@ -210,7 +210,7 @@ def print_percentiles(arr: np.ndarray) -> None:
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 @click.command()
-@click.option("--year", required=True, type=int, help="Year to process (e.g. 2023)")
+@click.option("--year", default=2023, show_default=True, type=int, help="Year to process")
 @click.option("--factor", default=4, type=int, help="Downsample factor before convolution")
 @click.option("--d0", default=2.5, type=float, help="Kernel falloff scale distance (km)")
 @click.option("--alpha", default=2.8, type=float, help="Kernel falloff exponent")

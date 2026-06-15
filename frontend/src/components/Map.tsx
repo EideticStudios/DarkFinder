@@ -15,26 +15,18 @@ const GIBS_TILES = [
 
 const TILE_VERSION = 7
 
-function tileUrl(layer: LayerId, year: number): string {
-  return `${API_BASE}/tiles/${layer}/${year}/{z}/{x}/{y}.png?v=${TILE_VERSION}`
+function tileUrl(layer: LayerId): string {
+  return `${API_BASE}/tiles/${layer}/{z}/{x}/{y}.png?v=${TILE_VERSION}`
 }
 
 interface MapProps {
-  year: number
   layer: LayerId
   hasData: boolean
 }
 
-export default function Map({ year, layer, hasData }: MapProps) {
+export default function Map({ layer, hasData }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
-  // Refs to avoid stale closures in the click handler
-  const yearRef = useRef(year)
-  const layerRef = useRef(layer)
-  useEffect(() => {
-    yearRef.current = year
-    layerRef.current = layer
-  }, [year, layer])
 
   // Initialize map once — hasData is already resolved before this mounts
   useEffect(() => {
@@ -54,7 +46,7 @@ export default function Map({ year, layer, hasData }: MapProps) {
           },
           viirs: {
             type: 'raster',
-            tiles: hasData ? [tileUrl(layer, year)] : GIBS_TILES,
+            tiles: hasData ? [tileUrl(layer)] : GIBS_TILES,
             tileSize: 256,
             maxzoom: hasData ? 13 : 8,
             attribution: 'NASA Black Marble VIIRS &copy; NASA / EOG',
@@ -87,14 +79,11 @@ export default function Map({ year, layer, hasData }: MapProps) {
 
     map.on('click', async (e) => {
       const { lat, lng } = e.lngLat
-      const currentYear = yearRef.current
 
       let html = `<strong>${lat.toFixed(4)}°, ${lng.toFixed(4)}°</strong><br/>`
 
       try {
-        const resp = await fetch(
-          `${API_BASE}/radiance?lat=${lat}&lng=${lng}&year=${currentYear}`
-        )
+        const resp = await fetch(`${API_BASE}/radiance?lat=${lat}&lng=${lng}`)
         if (resp.ok) {
           const data = await resp.json()
           html +=
@@ -120,7 +109,7 @@ export default function Map({ year, layer, hasData }: MapProps) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update tile source and opacity when year or layer changes
+  // Update tile source and opacity when the layer changes
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -129,7 +118,7 @@ export default function Map({ year, layer, hasData }: MapProps) {
       const source = map.getSource('viirs') as maplibregl.RasterTileSource | undefined
       if (!source) return
 
-      const newTiles = hasData ? [tileUrl(layer, year)] : GIBS_TILES
+      const newTiles = hasData ? [tileUrl(layer)] : GIBS_TILES
       source.setTiles(newTiles)
       map.setPaintProperty('viirs-overlay', 'raster-opacity', layer === 'skyglow' ? 0.78 : 0.85)
     }
@@ -140,7 +129,7 @@ export default function Map({ year, layer, hasData }: MapProps) {
       map.once('load', updateSource)
       return () => { map.off('load', updateSource) }
     }
-  }, [year, layer, hasData])
+  }, [layer, hasData])
 
   return <div ref={containerRef} className={styles.container} />
 }

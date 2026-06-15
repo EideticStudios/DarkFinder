@@ -231,7 +231,7 @@ def validate_cog(path: Path) -> bool:
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 @click.command()
-@click.option("--year", required=True, type=int, help="Year to process (e.g. 2023)")
+@click.option("--year", default=2023, show_default=True, type=int, help="Year to process")
 @click.option("--skip-validate", is_flag=True, default=False, help="Skip COG validation")
 def main(year: int, skip_validate: bool) -> None:
     """Process raw GEE VIIRS GeoTIFFs for a year into a Cloud-Optimized GeoTIFF."""
