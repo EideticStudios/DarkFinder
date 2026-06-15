@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { BORTLE_SCALE } from '../lib/bortleScale'
+import { INTRO_DESCRIPTION } from '../lib/copy'
 import styles from './AboutModal.module.css'
 
 type AboutModalProps = {
@@ -44,43 +45,36 @@ export default function AboutModal({ onClose }: AboutModalProps) {
         <h2 id="about-title" className={styles.title}>
           How DarkFinder works
         </h2>
-        <p className={styles.subtitle}>A free, open-source dark sky mapping project</p>
 
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>What this is</h3>
+          <p className={styles.text}>{INTRO_DESCRIPTION}</p>
+        </section>
+
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Where the data comes from</h3>
           <p className={styles.text}>
-            DarkFinder turns NASA VIIRS nighttime satellite imagery into an interactive
-            light-pollution heat map of the entire planet. Brighter colors mean there's
-            more light pollution, while darker ones indicate darker skies — so you can
-            find the nearest place to escape the glow and see the stars.
+            The map is built from VIIRS VNL V2.2, the 2023 annual nighttime-lights composite
+            produced by the Earth Observation Group at the Colorado School of Mines and accessed
+            through Google Earth Engine. It's the cloud-free, moonlight-corrected product, so
+            each pixel reflects steady year-round upward radiance rather than transient weather.
+            Values are calibrated radiance in nW/cm²/sr at roughly 500 meter (15 arc-second)
+            resolution, and the dataset is public domain.
+          </p>
+          <p className={styles.text}>
+            If the live data server is unreachable, the client falls back to NASA's pre-rendered
+            Black Marble tiles (2016) so the map still renders.
           </p>
         </section>
 
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>The data</h3>
+          <h3 className={styles.sectionTitle}>About the Bortle scale</h3>
           <p className={styles.text}>
-            The map is built from the <strong>VIIRS VNL V2.2</strong> annual nighttime-lights
-            composite for <strong>2023</strong>, produced by the Earth Observation Group at the
-            Colorado School of Mines and accessed through Google Earth Engine. It uses the
-            cloud- and moonlight-corrected <code>average_masked</code> band at roughly 500&nbsp;m
-            (15 arc-second) resolution, with brightness measured in radiance
-            (nW/cm²/sr). The dataset is public domain.
-          </p>
-          <p className={styles.text}>
-            If the live data backend isn't reachable, DarkFinder falls back to NASA's
-            pre-rendered Black Marble (2016) nighttime imagery so the map still works.
-          </p>
-        </section>
-
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>The Bortle scale</h3>
-          <p className={styles.text}>
-            The Bortle scale is a nine-step rating of how dark the night sky is, from
-            Class&nbsp;1 (pristine skies far from any city) up to Class&nbsp;9 (the washed-out
-            glow of an inner city). Here, each satellite radiance value is binned into one of
-            those nine classes and drawn in its own color. It's an approximation derived from
-            satellite brightness rather than a ground-based sky-quality reading, but it gives a
-            reliable picture of where the dark skies are.
+            The Bortle scale is a nine-step classification of night-sky darkness, running from
+            Class&nbsp;1, the pristine skies you only find well away from any city, to
+            Class&nbsp;9, the orange haze over a downtown. DarkFinder bins each pixel's radiance
+            into one of those nine classes and colors it accordingly. It's a satellite-derived
+            proxy rather than a ground-based sky-quality (SQM) reading, but it tracks real-world
+            darkness closely enough to be a reliable guide to where the dark skies are.
           </p>
           <ul className={styles.scale}>
             {BORTLE_SCALE.map((entry) => (
@@ -95,13 +89,54 @@ export default function AboutModal({ onClose }: AboutModalProps) {
         </section>
 
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>How it's built</h3>
+          <h3 className={styles.sectionTitle}>Sky Glow and Emission</h3>
           <p className={styles.text}>
-            Map tiles are rendered on the fly from a cloud-optimized GeoTIFF by a Python
-            (FastAPI + rio-tiler) backend, then drawn with MapLibre GL JS over the Carto Dark
-            Matter basemap — with place labels layered above the overlay so they stay readable.
-            You can switch between the sky-glow view (Bortle classes) and the raw light-emission
-            view. The whole project is open source.
+            DarkFinder renders the same area two ways, switchable from the toggle at the top.
+          </p>
+          <p className={styles.text}>
+            Emission is the raw upward radiance: the light leaving streetlights, buildings, and
+            everything else shining straight up. It maps where light is actually being produced.
+          </p>
+          <p className={styles.text}>
+            Sky Glow models what that light does next. Photons scatter through the atmosphere and
+            brighten the sky for up to a hundred kilometers around their source, which is why a
+            city washes out the stars long before you reach its streetlights. If you're hunting
+            for a genuinely dark site, this is the view that matters, which is why I've set it as 
+            the default one.
+          </p>
+          <p className={styles.text}>
+            Sky Glow is derrived from the Emission layer by spreading each source's light outward and
+            summing the contributions: nearby sources dominate, and their influence decays to
+            zero by roughly a hundred kilometers. The falloff follows the established
+            Falchi/Garstang model, so the result approximates the artificial sky brightness an
+            observer on the ground would actually see.
+          </p>
+        </section>
+
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Technical specs</h3>
+          <p className={styles.text}>
+            DarkFinder has a React and TypeScript frontend (Vite) and a Python FastAPI
+            backend. The source data is the global VIIRS VNL V2.2 annual composite, which the
+            pipeline reprojects and repackages into a Cloud-Optimized GeoTIFF (COG) with
+            internal tiling and overviews, so any zoom level can be served from a few HTTP
+            byte-range reads rather than loading the full multi-gigabyte raster.
+          </p>
+          <p className={styles.text}>
+            Tiles are rendered on demand. A <code>/tiles/{'{year}'}/{'{z}'}/{'{x}'}/{'{y}'}.png</code>{' '}
+            endpoint uses rio-tiler to read the matching window from the COG, applies the Bortle
+            color ramp, and returns a PNG. Nothing is baked into a static tile pyramid, so
+            adding a year or adjusting the ramp needs no re-tiling, and if the backend is
+            unreachable the client falls back to NASA's static Black Marble tiles. The Sky Glow
+            layer is the one heavy computation, so it's precomputed offline by convolving the
+            emission raster with a Falchi/Garstang distance-falloff kernel (SciPy), processed in
+            latitude bands to keep the kernel physically correct as longitudinal scale shrinks
+            toward the poles, then written out as its own COG served through the same path.
+          </p>
+          <p className={styles.text}>
+            In the browser, MapLibre GL JS composites three layers: Carto Dark Matter base tiles
+            underneath, the VIIRS raster in the middle, and Carto's label-only tiles on top so
+            place names stay legible above the glow. The whole project is open source.
           </p>
         </section>
 

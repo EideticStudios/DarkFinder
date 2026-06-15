@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { INTRO_DESCRIPTION } from '../lib/copy'
 import styles from './IntroModal.module.css'
 
 type IntroModalProps = {
@@ -32,11 +33,7 @@ export default function IntroModal({ onClose }: IntroModalProps) {
           DarkFinder
         </h2>
         <p className={styles.subtitle}>A free, open-source dark sky mapping project</p>
-        <p className={styles.description}>
-          DarkFinder turns NASA VIIRS nighttime satellite imagery into an interactive
-          light-pollution heat map of the entire planet. Brighter colors mean there's
-          more light pollution, while darker ones indicate darker skies.
-        </p>
+        <p className={styles.description}>{INTRO_DESCRIPTION}</p>
         <button ref={ctaRef} type="button" className={styles.cta} onClick={onClose}>
           Find dark skies near you!
         </button>

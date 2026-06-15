@@ -15,7 +15,7 @@
   position: relative;
   overflow-y: auto;
   width: 100%;
-  max-width: 720px;
+  max-width: 1020px;
   max-height: 85vh;
   padding: 48px 56px 44px;
   text-align: left;
@@ -82,22 +82,13 @@
   text-shadow: 0 0 24px rgba(120, 160, 255, 0.35);
 }
 
-.subtitle {
-  position: relative;
-  margin-top: 10px;
-  font-size: 17px;
-  font-weight: 500;
-  letter-spacing: 0.3px;
-  color: #9ca3af;
-}
-
 .section {
   position: relative;
   margin-top: 32px;
 }
 
 .sectionTitle {
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: 0.3px;
   color: #e6e9f0;
@@ -105,14 +96,14 @@
 
 .text {
   margin-top: 12px;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.7;
   color: #c4c9d2;
 }
 
 .text code {
   padding: 1px 5px;
-  font-size: 14px;
+  font-size: 16px;
   color: #dfe3ea;
   background: rgba(255, 255, 255, 0.07);
   border-radius: 4px;
@@ -146,7 +137,7 @@
 }
 
 .scaleLabel {
-  font-size: 14px;
+  font-size: 16px;
   color: #c4c9d2;
 }
 
@@ -161,8 +152,8 @@
   align-items: center;
   gap: 8px;
   margin-top: 36px;
-  padding: 11px 18px;
-  font-size: 15px;
+  padding: 12px 20px;
+  font-size: 16px;
   font-weight: 500;
   color: #c4c9d2;
   text-decoration: none;
