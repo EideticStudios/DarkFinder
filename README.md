@@ -84,13 +84,28 @@ glow. The whole project is open source.
 
 - **Node.js** (for the React/Vite frontend)
 - **Python 3.12+** and [**uv**](https://docs.astral.sh/uv/) (for the FastAPI backend)
-- A free **Google Earth Engine** account — the data pipeline downloads the VIIRS
-  composite through it. (Sign up at [earthengine.google.com](https://earthengine.google.com/);
-  approval is usually quick.)
+- A free **Google Earth Engine** account, with a **Google Cloud project** that has the
+  Earth Engine API enabled — the data pipeline downloads the VIIRS composite through it.
+  (Sign up at [earthengine.google.com](https://earthengine.google.com/); approval is
+  usually quick.)
+
+### Configure the project ID
+
+Before running the pipeline, point it at your Earth Engine–enabled GCP project. Copy the
+template and fill in your project ID:
+
+```bash
+cp backend/.env.example backend/.env
+# then edit backend/.env and set GEE_PROJECT=your-gcp-project-id
+```
+
+Without this, the download step exits with `GEE_PROJECT not set`. (`backend/.env` is
+gitignored.)
 
 ### First-time setup
 
-From the repo root, one command installs everything and builds the data:
+Once `backend/.env` is configured, one command from the repo root installs everything and
+builds the data:
 
 ```bash
 make setup
@@ -103,6 +118,11 @@ This runs three steps in order:
 2. **Authenticate** — opens a browser to sign in to Earth Engine (one-time).
 3. **Pipeline** — downloads the 2023 VIIRS composite and builds the emission and Sky Glow
    tiles. This is a large, one-time download, so expect it to take a while.
+
+The steps run in sequence, so if one fails (e.g. a missing `GEE_PROJECT`), `make setup`
+stops there. The earlier steps are safe to repeat, but once install and auth are done you
+can just re-run the step that failed — usually `make pipeline` — instead of the whole
+`make setup`.
 
 If you'd rather run the steps individually, they're also available on their own:
 
