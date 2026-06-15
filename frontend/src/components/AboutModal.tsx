@@ -163,8 +163,8 @@ export default function AboutModal({ onClose }: AboutModalProps) {
             than loading the full multi-gigabyte raster.
           </p>
           <p className={styles.text}>
-            Tiles are rendered on demand. A{' '}
-            <code>/tiles/{'{year}'}/{'{z}'}/{'{x}'}/{'{y}'}.png</code> endpoint uses{' '}
+            Tiles are rendered on demand.
+             An endpoint (<code>/tiles/{'{year}'}/{'{z}'}/{'{x}'}/{'{y}'}.png</code>) uses{' '}
             <Ref href={LINKS.rioTiler}>rio-tiler</Ref> to read the matching window from the COG,
             applies the Bortle color ramp, and returns a PNG. The Sky Glow layer is the one heavy
             computation, so it's precomputed offline by convolving the emission raster with a
