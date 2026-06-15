@@ -1,10 +1,17 @@
-.PHONY: dev-frontend dev-backend install lint typecheck \
+.PHONY: dev dev-frontend dev-backend install auth setup lint typecheck \
         download process skyglow pipeline validate
 
 PYTHON := .venv/bin/python
 YEAR   ?= 2023
 
 # ── Dev ────────────────────────────────────────────────────────────────────────
+
+# Run both servers from the repo root. One Ctrl-C stops both.
+dev:
+	@trap 'kill 0' INT; \
+	(cd backend && .venv/bin/uvicorn app.main:app --reload) & \
+	(cd frontend && npm run dev) & \
+	wait
 
 dev-frontend:
 	cd frontend && npm run dev
@@ -14,9 +21,16 @@ dev-backend:
 
 # ── Setup ──────────────────────────────────────────────────────────────────────
 
+# One-time bootstrap: deps, Earth Engine auth, then download + process the data.
+setup: install auth pipeline
+
 install:
 	cd frontend && npm install
 	cd backend && uv venv .venv --python 3.12 && uv pip install -r requirements.txt --python .venv/bin/python
+
+# Earth Engine ships its CLI inside the backend venv (not on PATH); run it from there.
+auth:
+	cd backend && .venv/bin/earthengine authenticate
 
 # ── Quality ───────────────────────────────────────────────────────────────────
 

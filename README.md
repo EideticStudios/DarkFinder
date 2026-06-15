@@ -84,27 +84,32 @@ glow. The whole project is open source.
 
 - **Node.js** (for the React/Vite frontend)
 - **Python 3.12+** and [**uv**](https://docs.astral.sh/uv/) (for the FastAPI backend)
-- A **Google Earth Engine** account, if you want to run the data pipeline yourself
-  (the frontend falls back to Black Marble tiles without it)
+- A free **Google Earth Engine** account — the data pipeline downloads the VIIRS
+  composite through it. (Sign up at [earthengine.google.com](https://earthengine.google.com/);
+  approval is usually quick.)
 
-### Install
+### First-time setup
 
-From the repo root, this sets up the frontend (`npm install`) and a backend virtualenv
-in `backend/.venv`:
+From the repo root, one command installs everything and builds the data:
 
 ```bash
-make install
+make setup
 ```
 
-### Get the data
+This runs three steps in order:
 
-The map needs a processed COG for at least one year. This is a one-time step that
-authenticates with Earth Engine, downloads the VIIRS composite, and builds the emission
-and Sky Glow tiles:
+1. **Install** — frontend packages (`npm install`) and a backend virtualenv in
+   `backend/.venv`.
+2. **Authenticate** — opens a browser to sign in to Earth Engine (one-time).
+3. **Pipeline** — downloads the 2023 VIIRS composite and builds the emission and Sky Glow
+   tiles. This is a large, one-time download, so expect it to take a while.
+
+If you'd rather run the steps individually, they're also available on their own:
 
 ```bash
-earthengine authenticate          # one-time, opens a browser
-make pipeline                     # download + process (mosaic + skyglow), defaults to 2023
+make install                      # deps only
+make auth                         # Earth Engine sign-in (opens a browser)
+make pipeline                     # download + process, defaults to 2023
 ```
 
 `YEAR` is optional and defaults to 2023; pass `make pipeline YEAR=2022` to target a
@@ -112,14 +117,14 @@ different year.
 
 ### Run
 
-Start the two dev servers in separate terminals:
+From the repo root, start both dev servers with one command (Ctrl-C stops both):
 
 ```bash
-make dev-frontend                 # Vite — http://localhost:5173
-make dev-backend                  # FastAPI — http://localhost:8000
+make dev                          # Vite on :5173, FastAPI on :8000
 ```
 
-Open http://localhost:5173 to view the map.
+Open http://localhost:5173 to view the map. (If the data server isn't running, the map
+falls back to NASA's pre-rendered Black Marble tiles so it still renders.)
 
 ### Quality checks
 
