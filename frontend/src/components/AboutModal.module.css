@@ -114,6 +114,25 @@
   font-weight: 600;
 }
 
+.link {
+  color: #9db4ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(157, 180, 255, 0.4);
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.link:hover {
+  color: #c2d0ff;
+  text-decoration-color: rgba(157, 180, 255, 0.85);
+}
+
+.link:focus-visible {
+  outline: 2px solid rgba(160, 185, 255, 0.9);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .scale {
   margin-top: 18px;
   display: grid;

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { BORTLE_SCALE } from '../lib/bortleScale'
 import { INTRO_DESCRIPTION } from '../lib/copy'
 import styles from './AboutModal.module.css'
@@ -8,6 +8,37 @@ type AboutModalProps = {
 }
 
 const GITHUB_URL = 'https://github.com/samrichards/dark-finder'
+
+// Reference links, attached to each term the first time it appears in the copy.
+const LINKS = {
+  viirs: 'https://en.wikipedia.org/wiki/Visible_Infrared_Imaging_Radiometer_Suite',
+  eog: 'https://eogdata.mines.edu/',
+  earthEngine: 'https://earthengine.google.com/',
+  blackMarble: 'https://blackmarble.gsfc.nasa.gov/',
+  bortle: 'https://en.wikipedia.org/wiki/Bortle_scale',
+  falchiGarstang: 'https://www.science.org/doi/10.1126/sciadv.1600377',
+  cog: 'https://www.cogeo.org/',
+  maplibre: 'https://maplibre.org/',
+  cartoDarkMatter: 'https://carto.com/basemaps',
+  react: 'https://react.dev/',
+  vite: 'https://vite.dev/',
+  fastapi: 'https://fastapi.tiangolo.com/',
+  rioTiler: 'https://cogeotiff.github.io/rio-tiler/',
+  scipy: 'https://scipy.org/',
+} as const
+
+function Ref({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={styles.link}>
+      {children}
+    </a>
+  )
+}
+
+// The opening paragraph is shared verbatim with the intro modal (kept DRY via
+// INTRO_DESCRIPTION), so we splice the NASA VIIRS link in around the phrase
+// rather than duplicating the sentence.
+const [introBeforeViirs, introAfterViirs] = INTRO_DESCRIPTION.split('NASA VIIRS')
 
 export default function AboutModal({ onClose }: AboutModalProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -47,45 +78,28 @@ export default function AboutModal({ onClose }: AboutModalProps) {
         </h2>
 
         <section className={styles.section}>
-          <p className={styles.text}>{INTRO_DESCRIPTION}</p>
+          <p className={styles.text}>
+            {introBeforeViirs}
+            <Ref href={LINKS.viirs}>NASA VIIRS</Ref>
+            {introAfterViirs}
+          </p>
         </section>
 
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Where the data comes from</h3>
+          <h3 className={styles.sectionTitle}>Data sources</h3>
           <p className={styles.text}>
             The map is built from VIIRS VNL V2.2, the 2023 annual nighttime-lights composite
-            produced by the Earth Observation Group at the Colorado School of Mines and accessed
-            through Google Earth Engine. It's the cloud-free, moonlight-corrected product, so
-            each pixel reflects steady year-round upward radiance rather than transient weather.
-            Values are calibrated radiance in nW/cm²/sr at roughly 500 meter (15 arc-second)
-            resolution, and the dataset is public domain.
+            produced by the <Ref href={LINKS.eog}>Earth Observation Group</Ref> at the Colorado
+            School of Mines and accessed through{' '}
+            <Ref href={LINKS.earthEngine}>Google Earth Engine</Ref>. It's the cloud-free,
+            moonlight-corrected product, so each pixel reflects steady year-round upward radiance
+            rather than transient weather. Values are calibrated radiance in nW/cm²/sr at roughly
+            500 meter (15 arc-second) resolution, and the dataset is public domain.
           </p>
           <p className={styles.text}>
-            If the live data server is unreachable, the client falls back to NASA's pre-rendered
-            Black Marble tiles (2016) so the map still renders.
+            If the live data server is unreachable, the client falls back to NASA's pre-rendered{' '}
+            <Ref href={LINKS.blackMarble}>Black Marble tiles</Ref> (2016) so the map still renders.
           </p>
-        </section>
-
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>About the Bortle scale</h3>
-          <p className={styles.text}>
-            The Bortle scale is a nine-step classification of night-sky darkness, running from
-            Class&nbsp;1, the pristine skies you only find well away from any city, to
-            Class&nbsp;9, the orange haze over a downtown. DarkFinder bins each pixel's radiance
-            into one of those nine classes and colors it accordingly. It's a satellite-derived
-            proxy rather than a ground-based sky-quality (SQM) reading, but it tracks real-world
-            darkness closely enough to be a reliable guide to where the dark skies are.
-          </p>
-          <ul className={styles.scale}>
-            {BORTLE_SCALE.map((entry) => (
-              <li key={entry.class} className={styles.scaleRow}>
-                <span className={styles.swatch} style={{ background: entry.color }} />
-                <span className={styles.scaleLabel}>
-                  <strong>{entry.label}</strong> · {entry.description}
-                </span>
-              </li>
-            ))}
-          </ul>
         </section>
 
         <section className={styles.section}>
@@ -101,40 +115,67 @@ export default function AboutModal({ onClose }: AboutModalProps) {
             Sky Glow models what that light does next. Photons scatter through the atmosphere and
             brighten the sky for up to a hundred kilometers around their source, which is why a
             city washes out the stars long before you reach its streetlights. If you're hunting
-            for a genuinely dark site, this is the view that matters, which is why I've set it as 
+            for a genuinely dark site, this is the view that matters, which is why I've set it as
             the default one.
           </p>
           <p className={styles.text}>
-            Sky Glow is derrived from the Emission layer by spreading each source's light outward and
-            summing the contributions: nearby sources dominate, and their influence decays to
-            zero by roughly a hundred kilometers. The falloff follows the established
-            Falchi/Garstang model, so the result approximates the artificial sky brightness an
-            observer on the ground would actually see.
+            Sky Glow is derived from the Emission layer by spreading each source's light outward
+            and summing the contributions: nearby sources dominate, and their influence decays to
+            zero by roughly a hundred kilometers. The falloff follows the established{' '}
+            <Ref href={LINKS.falchiGarstang}>Falchi/Garstang model</Ref>, so the result
+            approximates the artificial sky brightness an observer on the ground would actually
+            see.
           </p>
+        </section>
+
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>About the Bortle scale</h3>
+          <p className={styles.text}>
+            The <Ref href={LINKS.bortle}>Bortle scale</Ref> is a nine-step classification of
+            night-sky darkness, running from Class&nbsp;1, the pristine skies you only find well
+            away from any city, to Class&nbsp;9, the orange haze over a downtown. DarkFinder bins
+            each pixel's radiance into one of those nine classes and colors it accordingly. It's a
+            satellite-derived proxy rather than a ground-based sky-quality (SQM) reading, but it
+            tracks real-world darkness closely enough to be a reliable guide to where the dark
+            skies are.
+          </p>
+          <ul className={styles.scale}>
+            {BORTLE_SCALE.map((entry) => (
+              <li key={entry.class} className={styles.scaleRow}>
+                <span className={styles.swatch} style={{ background: entry.color }} />
+                <span className={styles.scaleLabel}>
+                  <strong>{entry.label}</strong> · {entry.description}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Technical specs</h3>
           <p className={styles.text}>
-            DarkFinder has a React and TypeScript frontend (Vite) and a Python FastAPI
-            backend. The source data is the global VIIRS VNL V2.2 annual composite, which the
-            pipeline reprojects and repackages into a Cloud-Optimized GeoTIFF (COG) with
-            internal tiling and overviews, so any zoom level can be served from a few HTTP
-            byte-range reads rather than loading the full multi-gigabyte raster.
+            DarkFinder has a <Ref href={LINKS.react}>React</Ref> and TypeScript frontend, built
+            with <Ref href={LINKS.vite}>Vite</Ref>, and a Python{' '}
+            <Ref href={LINKS.fastapi}>FastAPI</Ref> backend. The source data is the global VIIRS
+            VNL V2.2 annual composite, which the pipeline reprojects and repackages into a{' '}
+            <Ref href={LINKS.cog}>Cloud-Optimized GeoTIFF</Ref> (COG) with internal tiling and
+            overviews, so any zoom level can be served from a few HTTP byte-range reads rather
+            than loading the full multi-gigabyte raster.
           </p>
           <p className={styles.text}>
-            Tiles are rendered on demand. A <code>/tiles/{'{year}'}/{'{z}'}/{'{x}'}/{'{y}'}.png</code>{' '}
-            endpoint uses rio-tiler to read the matching window from the COG, applies the Bortle
-            color ramp, and returns a PNG. Nothing is baked into a static tile pyramid, so
-            adding a year or adjusting the ramp needs no re-tiling, and if the backend is
-            unreachable the client falls back to NASA's static Black Marble tiles. The Sky Glow
-            layer is the one heavy computation, so it's precomputed offline by convolving the
-            emission raster with a Falchi/Garstang distance-falloff kernel (SciPy), processed in
-            latitude bands to keep the kernel physically correct as longitudinal scale shrinks
-            toward the poles, then written out as its own COG served through the same path.
+            Tiles are rendered on demand. A{' '}
+            <code>/tiles/{'{year}'}/{'{z}'}/{'{x}'}/{'{y}'}.png</code> endpoint uses{' '}
+            <Ref href={LINKS.rioTiler}>rio-tiler</Ref> to read the matching window from the COG,
+            applies the Bortle color ramp, and returns a PNG. The Sky Glow layer is the one heavy
+            computation, so it's precomputed offline by convolving the emission raster with a
+            Falchi/Garstang distance-falloff kernel (<Ref href={LINKS.scipy}>SciPy</Ref>),
+            processed in latitude bands to keep the kernel physically correct as longitudinal
+            scale shrinks toward the poles, then written out as its own COG served through the
+            same path.
           </p>
           <p className={styles.text}>
-            In the browser, MapLibre GL JS composites three layers: Carto Dark Matter base tiles
+            In the browser, <Ref href={LINKS.maplibre}>MapLibre GL JS</Ref> composites three
+            layers: <Ref href={LINKS.cartoDarkMatter}>Carto Dark Matter</Ref> base tiles
             underneath, the VIIRS raster in the middle, and Carto's label-only tiles on top so
             place names stay legible above the glow. The whole project is open source.
           </p>
