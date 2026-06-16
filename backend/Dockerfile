@@ -12,6 +12,12 @@ ENV PYTHONUNBUFFERED=1 \
     CPL_VSIL_CURL_ALLOWED_EXTENSIONS=.tif \
     GDAL_HTTP_MULTIPLEX=YES
 
+# The rasterio / rio-tiler wheels bundle GDAL but still dynamically link a few
+# system libs that python:3.12-slim omits (notably libexpat). Install them.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements-serve.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
