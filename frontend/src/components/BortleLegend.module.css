@@ -53,3 +53,46 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   padding-top: 8px;
 }
+
+@media (max-width: 640px) {
+  .legend {
+    display: none; /* collapsed until the Scale pill opens it */
+    bottom: 56px; /* sit above the bottom-right Scale pill */
+    right: 12px;
+    padding: 12px 14px;
+    min-width: 0;
+    max-width: 62vw;
+  }
+
+  .legend.open {
+    display: block;
+  }
+
+  .title {
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+
+  .scale {
+    gap: 6px;
+  }
+
+  .row {
+    gap: 8px;
+  }
+
+  .swatch {
+    width: 12px;
+    height: 12px;
+  }
+
+  .label {
+    font-size: 12px;
+  }
+
+  .attribution {
+    font-size: 10px;
+    margin-top: 8px;
+    padding-top: 6px;
+  }
+}

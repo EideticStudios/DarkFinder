@@ -78,6 +78,14 @@ In the browser, [MapLibre GL JS](https://maplibre.org/) composites three layers:
 the middle, and Carto's label-only tiles on top so place names stay legible above the
 glow. The whole project is open source.
 
+## Attribution
+
+Base map tiles © [CARTO](https://carto.com/attributions), with map data ©
+[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors. Nighttime-lights
+data courtesy of NASA and the [Earth Observation Group](https://eogdata.mines.edu/) at the
+Colorado School of Mines. DarkFinder is an independent project and is not affiliated with
+or endorsed by these providers.
+
 ## Getting started
 
 ### Prerequisites

@@ -36,3 +36,10 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+@media (max-width: 640px) {
+  .button {
+    font-size: 13px;
+    padding: 7px 12px;
+  }
+}

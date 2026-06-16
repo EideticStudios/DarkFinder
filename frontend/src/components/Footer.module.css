@@ -14,3 +14,28 @@
   pointer-events: none;
   user-select: none;
 }
+
+.noWrap {
+  white-space: nowrap;
+}
+
+.link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+  pointer-events: auto; /* re-enable just the link; container stays click-through */
+}
+
+.link:hover {
+  color: #c9cdd4;
+}
+
+@media (max-width: 640px) {
+  .footer {
+    font-size: 11px;
+    line-height: 1.45;
+    /* Wrap and stop short of the "Show Scale" button at bottom-right */
+    max-width: calc(100% - 140px);
+  }
+}

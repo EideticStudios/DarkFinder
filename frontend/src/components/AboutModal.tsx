@@ -25,6 +25,8 @@ const LINKS = {
   fastapi: 'https://fastapi.tiangolo.com/',
   rioTiler: 'https://cogeotiff.github.io/rio-tiler/',
   scipy: 'https://scipy.org/',
+  carto: 'https://carto.com/attributions',
+  osm: 'https://www.openstreetmap.org/copyright',
 } as const
 
 function Ref({ href, children }: { href: string; children: ReactNode }) {
@@ -178,6 +180,17 @@ export default function AboutModal({ onClose }: AboutModalProps) {
             layers: <Ref href={LINKS.cartoDarkMatter}>Carto Dark Matter</Ref> base tiles
             underneath, the VIIRS raster in the middle, and Carto's label-only tiles on top so
             place names stay legible above the glow. The whole project is open source.
+          </p>
+        </section>
+
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Attribution</h3>
+          <p className={styles.text}>
+            Base map tiles © <Ref href={LINKS.carto}>CARTO</Ref>, with map data ©{' '}
+            <Ref href={LINKS.osm}>OpenStreetMap</Ref> contributors. Nighttime-lights data
+            courtesy of NASA and the <Ref href={LINKS.eog}>Earth Observation Group</Ref> at the
+            Colorado School of Mines. DarkFinder is an independent project and is not affiliated
+            with or endorsed by these providers.
           </p>
         </section>
 

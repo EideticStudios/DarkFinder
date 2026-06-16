@@ -217,6 +217,30 @@
     padding: 40px 28px 36px;
   }
 
+  .title {
+    font-size: 28px;
+  }
+
+  .sectionTitle {
+    font-size: 18px;
+  }
+
+  .text {
+    font-size: 15px;
+  }
+
+  .text code {
+    font-size: 14px;
+  }
+
+  .scaleLabel {
+    font-size: 14px;
+  }
+
+  .githubLink {
+    font-size: 14px;
+  }
+
   .scale {
     grid-template-columns: 1fr;
   }

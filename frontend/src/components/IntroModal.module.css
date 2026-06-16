@@ -116,6 +116,30 @@
   }
 }
 
+@media (max-width: 640px) {
+  .modal {
+    padding: 40px 28px 36px;
+  }
+
+  .title {
+    font-size: 32px;
+    letter-spacing: 0.8px;
+  }
+
+  .subtitle {
+    font-size: 15px;
+  }
+
+  .description {
+    font-size: 15px;
+  }
+
+  .cta {
+    font-size: 15px;
+    padding: 14px 20px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .backdrop,
   .modal {

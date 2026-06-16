@@ -71,6 +71,7 @@ export default function Map({ layer, hasData }: MapProps) {
       center: [-95, 38],
       zoom: 3,
       minZoom: 2,
+      attributionControl: false,
     })
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right')

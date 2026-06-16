@@ -19,6 +19,7 @@ export default function App() {
   const [ready, setReady] = useState(false)
   const [showIntro, setShowIntro] = useState(() => !localStorage.getItem(INTRO_SEEN_KEY))
   const [showAbout, setShowAbout] = useState(false)
+  const [showLegend, setShowLegend] = useState(false)
 
   const handleCloseIntro = () => {
     setShowIntro(false)
@@ -49,12 +50,20 @@ export default function App() {
         <h1 className="title">DarkFinder</h1>
         <LayerToggle layer={activeLayer} onChange={setLayer} skyglowAvailable={skyglowAvailable} />
         <button type="button" className="aboutButton" onClick={() => setShowAbout(true)}>
-          How this works
+          Info
         </button>
       </header>
       <div className="mapWrapper">
         {ready && <Map layer={activeLayer} hasData={hasData} />}
-        {activeLayer === 'skyglow' ? <BortleLegend /> : <EmissionLegend />}
+        {activeLayer === 'skyglow' ? <BortleLegend open={showLegend} /> : <EmissionLegend open={showLegend} />}
+        <button
+          type="button"
+          className="scaleToggle"
+          aria-expanded={showLegend}
+          onClick={() => setShowLegend((v) => !v)}
+        >
+          {showLegend ? 'Hide Scale' : 'Show Scale'}
+        </button>
         <Footer />
       </div>
       {showIntro && <IntroModal onClose={handleCloseIntro} />}

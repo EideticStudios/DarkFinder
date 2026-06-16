@@ -6,9 +6,9 @@ function formatRange(min: number, max: number | null): string {
   return `${min} – ${max}`
 }
 
-export default function EmissionLegend() {
+export default function EmissionLegend({ open = false }: { open?: boolean }) {
   return (
-    <div className={styles.legend}>
+    <div className={`${styles.legend} ${open ? styles.open : ''}`}>
       <h3 className={styles.title}>Radiance</h3>
       <div className={styles.scale}>
         {BORTLE_SCALE.map((entry) => (

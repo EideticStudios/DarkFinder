@@ -33,7 +33,7 @@
   color: #9ca3af;
   background: none;
   cursor: pointer;
-  padding: 8px 14px;
+  padding: 8px 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   transition: color 0.2s, border-color 0.2s;
@@ -53,4 +53,42 @@
   position: relative;
   flex: 1;
   overflow: hidden;
+}
+
+.scaleToggle {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 0 14px;
+    height: 56px;
+  }
+
+  .title {
+    font-size: 16px;
+    letter-spacing: 0.3px;
+  }
+
+  .aboutButton {
+    font-size: 13px;
+    padding: 7px 12px;
+  }
+
+  .scaleToggle {
+    display: block;
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    z-index: 6;
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 12px;
+    color: #c9cdd4;
+    background: rgba(10, 10, 15, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+  }
 }
