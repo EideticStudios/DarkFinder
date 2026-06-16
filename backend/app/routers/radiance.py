@@ -36,7 +36,7 @@ class RadianceResponse(BaseModel):
 @router.get("/radiance", response_model=RadianceResponse)
 def get_radiance(lat: float, lng: float) -> RadianceResponse:
     cog_path = latest_emission_cog()
-    if cog_path is None or not cog_path.exists():
+    if cog_path is None:
         raise HTTPException(status_code=404, detail="No processed data available")
 
     if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
@@ -57,7 +57,7 @@ def get_radiance(lat: float, lng: float) -> RadianceResponse:
     # Sample sky-glow COG if available
     skyglow_val: float | None = None
     skyglow_path = latest_skyglow_cog()
-    if skyglow_path is not None and skyglow_path.exists():
+    if skyglow_path is not None:
         try:
             from rasterio.warp import transform as rio_transform
             with rasterio.open(skyglow_path) as ds:

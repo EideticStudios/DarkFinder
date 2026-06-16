@@ -1,0 +1,12 @@
+# Keep the build context small and the image clean.
+data/
+tiles/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+requirements.txt

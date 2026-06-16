@@ -16,7 +16,7 @@ _CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
 @router.get("/tiles/{layer}/{z}/{x}/{y}.png")
 def get_layer_tile(layer: Layer, z: int, x: int, y: int) -> Response:
     cog_path = latest_skyglow_cog() if layer == "skyglow" else latest_emission_cog()
-    if cog_path is None or not cog_path.exists():
+    if cog_path is None:
         raise HTTPException(status_code=404, detail=f"No {layer} data available")
 
     try:

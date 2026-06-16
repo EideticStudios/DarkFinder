@@ -16,8 +16,12 @@ FRONTEND_ORIGINS = [
 ]
 
 
-def latest_emission_cog() -> Path | None:
-    """Newest emission COG in PROCESSED_DIR (by year), or None if none exist."""
+def latest_emission_cog() -> str | None:
+    """Emission COG to serve: an env-provided URL if set (e.g. R2), else the
+    newest local file by year. Returns a path or URL string, or None."""
+    url = os.environ.get("EMISSION_COG_URL")
+    if url:
+        return url
     if not PROCESSED_DIR.exists():
         return None
     cogs = [
@@ -25,11 +29,16 @@ def latest_emission_cog() -> Path | None:
         for p in PROCESSED_DIR.glob("*_cog.tif")
         if p.stem.replace("_cog", "").isdigit()  # excludes *_skyglow_cog.tif
     ]
-    return max(cogs, key=lambda p: int(p.stem.replace("_cog", "")), default=None)
+    newest = max(cogs, key=lambda p: int(p.stem.replace("_cog", "")), default=None)
+    return str(newest) if newest else None
 
 
-def latest_skyglow_cog() -> Path | None:
-    """Newest sky-glow COG in PROCESSED_DIR (by year), or None if none exist."""
+def latest_skyglow_cog() -> str | None:
+    """Sky-glow COG to serve: an env-provided URL if set (e.g. R2), else the
+    newest local file by year. Returns a path or URL string, or None."""
+    url = os.environ.get("SKYGLOW_COG_URL")
+    if url:
+        return url
     if not PROCESSED_DIR.exists():
         return None
     cogs = [
@@ -37,4 +46,5 @@ def latest_skyglow_cog() -> Path | None:
         for p in PROCESSED_DIR.glob("*_skyglow_cog.tif")
         if p.stem.replace("_skyglow_cog", "").isdigit()
     ]
-    return max(cogs, key=lambda p: int(p.stem.replace("_skyglow_cog", "")), default=None)
+    newest = max(cogs, key=lambda p: int(p.stem.replace("_skyglow_cog", "")), default=None)
+    return str(newest) if newest else None
