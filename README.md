@@ -3,7 +3,8 @@
 DarkFinder turns [NASA VIIRS](https://en.wikipedia.org/wiki/Visible_Infrared_Imaging_Radiometer_Suite)
 nighttime satellite imagery into an interactive light-pollution heat map of the entire
 planet. Brighter colors mean there's more light pollution, while darker ones indicate
-darker skies.
+darker skies. Check out [the current Vercel deployment](https://dark-finder.vercel.app/) 
+if you're interested in seeing it in action!  
 
 ## Data sources
 
