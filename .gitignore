@@ -20,7 +20,6 @@ backend/.venv/
 
 # Data — large downloaded/generated files, never commit
 backend/data/
-backend/tiles/
 
 # Environment
 .env

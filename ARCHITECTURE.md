@@ -36,7 +36,8 @@ The frontend is a single-page app with one primary view: a full-viewport map.
 - WebGL-accelerated, smooth tile rendering
 - No API key required
 - npm package: `maplibre-gl`
-- React bindings: `react-map-gl` (supports MapLibre via the `mapLib` prop)
+- Used directly via its imperative API (`map.addSource` / `map.addLayer`) inside a
+  custom React `Map` component — there is no `react-map-gl` wrapper dependency
 
 **Base map: Carto Dark Matter**
 - Free, no API key (fair use policy)
@@ -49,7 +50,7 @@ The light pollution layer is a standard raster tile layer added on top of the ba
 ```ts
 map.addSource('light-pollution', {
   type: 'raster',
-  tiles: ['https://your-backend.com/api/v1/tiles/{year}/{z}/{x}/{y}.png'],
+  tiles: ['https://your-backend.com/api/v1/tiles/{layer}/{z}/{x}/{y}.png'],
   tileSize: 256,
   attribution: 'VIIRS VNL V2.2 / EOG Colorado School of Mines via GEE'
 });
@@ -63,39 +64,50 @@ map.addLayer({
 ```
 
 **UI components:**
-- `Map` — full-viewport MapLibre instance
-- `BortleLegend` — color ramp legend (bottom-left or bottom-right)
-- `YearSelector` — dropdown or slider for year selection (2014-2023)
-- `InfoPanel` — shows radiance / Bortle class on click
-- `SearchBar` — geocoding / place search (use Nominatim, free)
-- `Header` — minimal top bar with title and about link
+- `Map` — full-viewport MapLibre instance; a click opens a popup with the sampled radiance
+- `LayerToggle` — switches between the Sky Glow and Emission layers (Sky Glow is the default)
+- `BortleLegend` — Bortle color-ramp legend, shown for the Sky Glow layer
+- `EmissionLegend` — color-ramp legend, shown for the Emission layer
+- `IntroModal` — first-visit intro overlay (dismissal remembered in localStorage)
+- `AboutModal` — about / methodology panel, opened from the header "Info" button
+- `Footer` — minimal bottom bar with attribution
+
+The top bar itself is inline markup in `App.tsx` (title, `LayerToggle`, Info button)
+rather than a dedicated component.
 
 ### Backend (Python + FastAPI)
 
-The backend has two responsibilities: serve tiles and answer point queries.
+The backend has three responsibilities: serve tiles, answer point queries, and report
+which layers are available for the frontend to bootstrap against.
 
 **Tile serving:**
 Tiles are rendered on-the-fly from Cloud-Optimized GeoTIFFs (COGs) using rio-tiler. FastAPI acts as the tile server and the API for point queries.
 
 **Endpoints:**
 ```
-GET /api/v1/tiles/{year}/{z}/{x}/{y}.png
-  -> Returns a 256x256 PNG tile rendered from the COG
-  -> 404 if tile doesn't exist (ocean, out of bounds)
-  -> Cache-Control: public, max-age=31536000 (immutable data)
+GET /api/v1/tiles/{layer}/{z}/{x}/{y}.png
+  -> layer is "emission" or "skyglow"
+  -> Returns a 256x256 PNG tile rendered on the fly from that layer's COG
+  -> 404 if the tile falls outside the data bounds (ocean, out of bounds)
+     or no COG is available for the layer
+  -> Cache-Control: public, max-age=3600
 
-GET /api/v1/radiance?lat={lat}&lng={lng}&year={year}
-  -> Returns JSON: { radiance: float, bortle: int, sqm: float, year: int }
-  -> Reads directly from the source GeoTIFF via rasterio
-  -> No pre-processing needed, just a point sample
+GET /api/v1/radiance?lat={lat}&lng={lng}
+  -> Returns JSON: { radiance: float, bortle: int, sqm: float, skyglow: float | null }
+  -> Samples the emission COG via rasterio; also samples the sky-glow COG when one
+     is present (used for the SQM estimate, a better proxy than point emission)
+  -> 422 if lat/lng are out of range
 
-GET /api/v1/years
-  -> Returns JSON: { years: [2014, 2015, ..., 2023] }
-  -> Lists available processed years
+GET /api/v1/layers
+  -> Returns JSON: { emission: bool, skyglow: bool }
+  -> Reports which layers have a processed COG available, for frontend bootstrap
 
 GET /api/v1/health
   -> Returns JSON: { status: "ok" }
 ```
+
+The serving layer is single-year: it auto-discovers the newest processed COG for each
+layer. Year is only a pipeline/build concept and never appears in the served API.
 
 ### Data Pipeline (Python scripts)
 
@@ -115,14 +127,26 @@ The pipeline is a set of CLI scripts in `backend/app/pipeline/` that download an
    - Save as a Cloud-Optimized GeoTIFF (COG), single-band float32, EPSG:4326
    - Output: `backend/data/processed/{year}_cog.tif`
 
-There is no reprojection, colorization, or tile-pyramid generation step. Reprojection to EPSG:3857 and the radiance -> RGBA color ramp are applied per-tile at serve time by rio-tiler reading the COG.
+3. **Sky Glow** (`skyglow.py`)
+   - Models where emitted light ends up by propagating each source outward ~100 km
+   - Convolves the emission raster with a Falchi/Garstang distance-falloff kernel
+     (FFT-based, run in latitude bands so the kernel stays physically correct toward
+     the poles)
+   - Output: `backend/data/processed/{year}_skyglow_cog.tif` — same grid/format as
+     the emission COG. This is the app's default layer.
+
+There is no reprojection or tile-pyramid generation step. Reprojection to EPSG:3857 and
+the radiance -> RGBA color ramp are applied per-tile at serve time by rio-tiler reading
+the COG. Colorization is likewise a serve-time step, not baked into the COGs. See
+`DATA_PIPELINE.md` for the full processing reference (including the optional `validate.py`
+data-quality check).
 
 ## 4. Data Flow
 
 ```
 User loads map -> MapLibre requests tile -> FastAPI + rio-tiler reads COG window -> colorizes -> serves PNG
 User clicks map -> Frontend sends lat/lng -> FastAPI samples GeoTIFF -> returns radiance JSON
-User changes year -> Frontend swaps tile source URL -> new tiles load
+User toggles layer -> Frontend swaps the tile source's {layer} URL -> new tiles load
 ```
 
 ## 5. Key Design Decisions
@@ -131,7 +155,7 @@ User changes year -> Frontend swaps tile source URL -> new tiles load
 MapLibre is WebGL-accelerated, handles raster tile overlays smoothly, and supports vector basemaps for future enhancement. Leaflet would work fine for an MVP but MapLibre handles the use case better at scale.
 
 **Why COG + on-the-fly rendering over pre-generated tiles?**
-A Cloud-Optimized GeoTIFF stores internal tile overviews so that rio-tiler can fetch only the spatial window needed for a given XYZ tile, without reading the whole file. This eliminates two large intermediate files from the pipeline (a reprojected EPSG:3857 raster and a colorized RGBA raster) and keeps the color ramp as a runtime config rather than pixels baked into thousands of PNGs. With `Cache-Control: immutable` headers (or a CDN), popular tiles are cached after the first render; since the data only changes once a year, the cache hit rate is high. The tradeoff is a running Python process in production, which the FastAPI backend already provides.
+A Cloud-Optimized GeoTIFF stores internal tile overviews so that rio-tiler can fetch only the spatial window needed for a given XYZ tile, without reading the whole file. This eliminates two large intermediate files from the pipeline (a reprojected EPSG:3857 raster and a colorized RGBA raster) and keeps the color ramp as a runtime config rather than pixels baked into thousands of PNGs. With cache headers (`Cache-Control: public, max-age=3600`) or a CDN in front, popular tiles are cached after the first render; since the data only changes once a year, the cache hit rate is high. The tradeoff is a running Python process in production, which the FastAPI backend already provides.
 
 **Why FastAPI over Flask/Django?**
 FastAPI is the modern Python web framework with built-in OpenAPI docs, async support, and type validation via Pydantic. It's a better fit than Flask and far less overhead than Django for an API-only backend.

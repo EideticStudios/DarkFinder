@@ -149,10 +149,9 @@ DarkFinder/
 ├── Makefile               <- Dev/pipeline task runner
 ├── .gitignore
 ├── .github/workflows/     <- CI configuration
-├── docs/
-│   ├── ARCHITECTURE.md    <- System design and tech decisions
-│   ├── PLAN.md            <- Phased implementation plan
-│   └── DATA_PIPELINE.md   <- VIIRS data processing reference
+├── ARCHITECTURE.md        <- System design and tech decisions
+├── DATA_PIPELINE.md       <- VIIRS data processing reference
+├── SETUP.md               <- This setup guide
 ├── frontend/
 │   ├── src/
 │   │   ├── components/    <- React components (Map, Legend, etc.)

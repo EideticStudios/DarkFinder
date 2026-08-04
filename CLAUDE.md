@@ -12,10 +12,12 @@ The project is structured as a monorepo with two packages: `frontend/` and `back
 DarkFinder/
 ├── frontend/          # React + TypeScript + Vite
 │   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── hooks/         # Custom React hooks
-│   │   ├── lib/           # Utilities, constants, types
-│   │   └── styles/        # Global styles
+│   │   ├── components/    # React components (Map, legends, modals, toggle, footer)
+│   │   ├── lib/           # Utilities, constants, types (api, layers, bortleScale, copy)
+│   │   ├── assets/        # Static assets bundled by Vite
+│   │   ├── App.tsx
+│   │   ├── index.css      # Global styles (co-located CSS Modules for components)
+│   │   └── main.tsx
 │   ├── public/
 │   ├── index.html
 │   ├── package.json
@@ -30,12 +32,14 @@ DarkFinder/
 │   │   ├── pipeline/      # Data processing scripts
 │   │   └── config.py      # Settings and constants
 │   ├── data/              # Downloaded/processed geospatial data (gitignored)
-│   ├── tiles/             # Generated tile pyramids (gitignored)
-│   ├── pyproject.toml
-│   └── requirements.txt
-├── docs/              # Planning and architecture docs
+│   ├── Dockerfile         # Backend container image (Railway deploy)
+│   ├── requirements.txt          # Full deps (pipeline + serving)
+│   └── requirements-serve.txt    # Slim deps for the serving-only container
 ├── .github/
 │   └── workflows/     # CI (lint, typecheck, test)
+├── ARCHITECTURE.md    # System design and tech decisions
+├── DATA_PIPELINE.md   # VIIRS data processing reference
+├── SETUP.md           # Setup guide
 ├── CLAUDE.md          # This file
 ├── README.md
 ├── .gitignore
@@ -146,7 +150,7 @@ make dev-backend
 
 - When working on the frontend, `cd frontend` first. The Vite dev server runs from there.
 - When working on the backend, `cd backend` first. The FastAPI server runs from there.
-- Never commit anything in `backend/data/` or `backend/tiles/` — these are gitignored and can be multiple GB.
+- Never commit anything in `backend/data/` — it's gitignored and can be multiple GB. 
 - The VIIRS GeoTIFFs are large (hundreds of MB to several GB). Pipeline scripts should be resumable.
 - MapLibre GL JS uses `maplibre-gl` on npm, not `mapbox-gl`. They are API-compatible but the package name matters.
 - The Carto Dark Matter basemap uses split tiles so labels render above the VIIRS overlay: `dark_nolabels` (bottom), VIIRS overlay (middle), `dark_only_labels` (top). URLs: `https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png` and `https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png` (no API key needed, subject to fair use terms).

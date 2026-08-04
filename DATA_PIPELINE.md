@@ -139,7 +139,7 @@ always agree. They differ only in how values map onto that palette:
 - `tile_renderer.py` is the single source of truth for the breakpoints and palette — keep
   the frontend legend (`bortleScale.ts`) and the color-ramp table in `CLAUDE.md` in sync
   with it, and tune against real SQM measurement data.
-- Cache rendered tiles at the HTTP layer (`Cache-Control: public, max-age=31536000, immutable`). The data is annual and immutable once processed.
+- Rendered tiles are cached at the HTTP layer (`Cache-Control: public, max-age=3600`; see `tiles.py`). The data is annual and effectively immutable once processed, so this TTL can safely be raised or fronted with a CDN for higher cache-hit rates.
 - The COG can be read directly from remote storage (e.g. Cloudflare R2) by passing a `/vsicurl/https://...` path to rio-tiler. GDAL's range-request support means only the needed tile window is fetched over the network.
 
 ## Radiance -> Bortle / SQM Conversion
