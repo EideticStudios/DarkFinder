@@ -90,7 +90,9 @@ GET /api/v1/tiles/{layer}/{z}/{x}/{y}.png
   -> Returns a 256x256 PNG tile rendered on the fly from that layer's COG
   -> 404 if the tile falls outside the data bounds (ocean, out of bounds)
      or no COG is available for the layer
-  -> Cache-Control: public, max-age=3600
+  -> Cache-Control: public, max-age=86400, immutable
+  -> Rendered PNGs are also cached in-process (bounded LRU keyed by layer+z/x/y),
+     so repeat requests skip the remote COG read + render entirely
 
 GET /api/v1/radiance?lat={lat}&lng={lng}
   -> Returns JSON: { radiance: float, bortle: int, sqm: float, skyglow: float | null }
@@ -155,7 +157,7 @@ User toggles layer -> Frontend swaps the tile source's {layer} URL -> new tiles 
 MapLibre is WebGL-accelerated, handles raster tile overlays smoothly, and supports vector basemaps for future enhancement. Leaflet would work fine for an MVP but MapLibre handles the use case better at scale.
 
 **Why COG + on-the-fly rendering over pre-generated tiles?**
-A Cloud-Optimized GeoTIFF stores internal tile overviews so that rio-tiler can fetch only the spatial window needed for a given XYZ tile, without reading the whole file. This eliminates two large intermediate files from the pipeline (a reprojected EPSG:3857 raster and a colorized RGBA raster) and keeps the color ramp as a runtime config rather than pixels baked into thousands of PNGs. With cache headers (`Cache-Control: public, max-age=3600`) or a CDN in front, popular tiles are cached after the first render; since the data only changes once a year, the cache hit rate is high. The tradeoff is a running Python process in production, which the FastAPI backend already provides.
+A Cloud-Optimized GeoTIFF stores internal tile overviews so that rio-tiler can fetch only the spatial window needed for a given XYZ tile, without reading the whole file. This eliminates two large intermediate files from the pipeline (a reprojected EPSG:3857 raster and a colorized RGBA raster) and keeps the color ramp as a runtime config rather than pixels baked into thousands of PNGs. Rendered tiles are additionally cached in-process (a bounded LRU keyed by layer + z/x/y), so the slow first render of a tile is paid once per process; and with cache headers (`Cache-Control: public, max-age=86400, immutable`) or a CDN in front, popular tiles are cached client- and edge-side too. Since the data only changes once a year, the cache hit rate is high. The tradeoff is a running Python process in production, which the FastAPI backend already provides.
 
 **Why FastAPI over Flask/Django?**
 FastAPI is the modern Python web framework with built-in OpenAPI docs, async support, and type validation via Pydantic. It's a better fit than Flask and far less overhead than Django for an API-only backend.

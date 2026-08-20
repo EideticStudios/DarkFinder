@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { LayerId } from '../lib/layers'
@@ -27,6 +27,16 @@ interface MapProps {
 export default function Map({ layer, hasData }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  // Latest desired layer/hasData, readable from map event callbacks.
+  const layerRef = useRef(layer)
+  const hasDataRef = useRef(hasData)
+  // Latches true on the map's first 'load' and stays true. We must NOT gate tile
+  // updates on map.isStyleLoaded(), which flaps back to false whenever tiles are
+  // still loading — a toggle during that window would otherwise be silently dropped.
+  const styleReadyRef = useRef(false)
+  // Imperative "apply the current layer to the viirs source" set up at init.
+  const applyLayerRef = useRef<(() => void) | null>(null)
+  const [loading, setLoading] = useState(false)
 
   // Initialize map once — hasData is already resolved before this mounts
   useEffect(() => {
@@ -102,35 +112,56 @@ export default function Map({ layer, hasData }: MapProps) {
       popup.setLngLat(e.lngLat).setHTML(html).addTo(map)
     })
 
+    // Push the currently-selected layer onto the viirs source. Reads the refs, so it
+    // always applies the newest selection even if it was queued during a load.
+    const applyLayer = () => {
+      const source = map.getSource('viirs') as maplibregl.RasterTileSource | undefined
+      if (!source) return
+      const l = layerRef.current
+      const newTiles = hasDataRef.current ? [tileUrl(l)] : GIBS_TILES
+      source.setTiles(newTiles)
+      map.setPaintProperty('viirs-overlay', 'raster-opacity', l === 'skyglow' ? 0.78 : 0.85)
+    }
+    applyLayerRef.current = applyLayer
+
+    map.on('load', () => {
+      // Latch ready and apply the latest selection in case it changed mid-load.
+      styleReadyRef.current = true
+      applyLayer()
+    })
+    // Loading feedback: the map is "busy" while any tiles are in flight.
+    map.on('dataloading', () => setLoading(true))
+    map.on('idle', () => setLoading(false))
+
     mapRef.current = map
 
     return () => {
       map.remove()
       mapRef.current = null
+      applyLayerRef.current = null
+      styleReadyRef.current = false
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update tile source and opacity when the layer changes
+  // Apply layer/hasData changes. Update the refs first so both the immediate call and the
+  // deferred 'load' handler see the newest selection. Once the style has loaded, setTiles
+  // can be called at any time — so we gate on the latching styleReadyRef, never on
+  // isStyleLoaded() (which flaps false while tiles load). If the style isn't ready yet, the
+  // map's 'load' handler applies the latest ref values.
   useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const updateSource = () => {
-      const source = map.getSource('viirs') as maplibregl.RasterTileSource | undefined
-      if (!source) return
-
-      const newTiles = hasData ? [tileUrl(layer)] : GIBS_TILES
-      source.setTiles(newTiles)
-      map.setPaintProperty('viirs-overlay', 'raster-opacity', layer === 'skyglow' ? 0.78 : 0.85)
-    }
-
-    if (map.isStyleLoaded()) {
-      updateSource()
-    } else {
-      map.once('load', updateSource)
-      return () => { map.off('load', updateSource) }
-    }
+    layerRef.current = layer
+    hasDataRef.current = hasData
+    if (styleReadyRef.current) applyLayerRef.current?.()
   }, [layer, hasData])
 
-  return <div ref={containerRef} className={styles.container} />
+  return (
+    <div className={styles.wrapper}>
+      <div ref={containerRef} className={styles.container} />
+      {loading && (
+        <div className={styles.loading} role="status" aria-label="Loading map data">
+          <span className={styles.spinner} />
+        </div>
+      )}
+    </div>
+  )
 }

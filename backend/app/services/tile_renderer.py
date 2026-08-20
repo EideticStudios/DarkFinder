@@ -5,12 +5,46 @@ their value anchors and interpolation (linear for emission, log for sky-glow).
 """
 
 import io
+import os
+import threading
+from collections import OrderedDict
 from typing import Literal
 
 import numpy as np
 from PIL import Image
 
 Layer = Literal["emission", "skyglow"]
+
+# ── GDAL / VSI tuning for remote COG reads ────────────────────────────────────
+# Applied to the process environment at import (before any GDAL raster access) so
+# the settings hold regardless of how the process was launched (Docker ENV, bare
+# uvicorn, tests) — GDAL reads config options from the environment. When the COG
+# lives on R2 and is read via /vsicurl, these cut the number of HTTP range
+# round-trips per tile: merge adjacent ranges, keep a large curl range cache, and
+# grab the header + first overview index in a single read at open. setdefault so
+# an explicit deploy-time value (e.g. the Dockerfile's GDAL_CACHEMAX) still wins.
+_GDAL_ENV = {
+    "GDAL_HTTP_MULTIPLEX": "YES",
+    "GDAL_HTTP_MERGE_CONSECUTIVE_RANGES": "YES",
+    "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
+    "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",
+    "VSI_CACHE": "TRUE",
+    "CPL_VSIL_CURL_CACHE_SIZE": "200000000",  # 200 MB range cache
+    "GDAL_INGESTED_BYTES_AT_OPEN": "32768",
+    "GDAL_CACHEMAX": "512",
+}
+for _k, _v in _GDAL_ENV.items():
+    os.environ.setdefault(_k, _v)
+
+# ── Rendered-tile LRU cache ───────────────────────────────────────────────────
+# The COGs are immutable for the life of the process, so a rendered PNG for a
+# given (cog, layer, z, x, y) never changes — cache the bytes (and the None
+# out-of-bounds result) so repeat requests (pan-back, re-toggle, other users)
+# skip the remote read + render entirely. Bounded LRU; thread-safe because the
+# sync tile endpoint runs in FastAPI's threadpool.
+_TILE_CACHE_MAX = int(os.environ.get("TILE_CACHE_SIZE", "512"))
+_tile_cache: "OrderedDict[tuple, bytes | None]" = OrderedDict()
+_tile_cache_lock = threading.Lock()
 
 # ── Shared color ramp ─────────────────────────────────────────────────────────
 # One vivid 9-stop palette (Bortle classes 1–9) shared by both the emission and
@@ -163,7 +197,9 @@ def render_tile(
 
     try:
         with COGReader(cog_path) as cog:
-            img = cog.tile(x, y, z, resampling_method="bilinear", reproject_method="bilinear")
+            img = cog.tile(
+                x, y, z, resampling_method="bilinear", reproject_method="bilinear"
+            )
     except TileOutsideBounds:
         return None
 
@@ -183,3 +219,31 @@ def render_tile(
     buf = io.BytesIO()
     pil_img.save(buf, format="PNG", optimize=False)
     return buf.getvalue()
+
+
+def render_tile_cached(
+    cog_path: str, z: int, x: int, y: int, layer: Layer = "emission"
+) -> bytes | None:
+    """
+    Cached wrapper around render_tile. Returns rendered PNG bytes (or None for
+    out-of-bounds tiles) from an in-process LRU, rendering on a miss. The cache
+    key includes cog_path, so it self-invalidates if the served COG changes.
+    """
+    key = (cog_path, layer, z, x, y)
+
+    with _tile_cache_lock:
+        if key in _tile_cache:
+            _tile_cache.move_to_end(key)
+            return _tile_cache[key]
+
+    # Render outside the lock so slow remote reads don't serialize all requests.
+    # A concurrent duplicate render is harmless (same input → same output).
+    png_bytes = render_tile(cog_path, z, x, y, layer=layer)
+
+    with _tile_cache_lock:
+        _tile_cache[key] = png_bytes
+        _tile_cache.move_to_end(key)
+        while len(_tile_cache) > _TILE_CACHE_MAX:
+            _tile_cache.popitem(last=False)
+
+    return png_bytes
