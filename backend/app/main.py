@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import API_PREFIX, FRONTEND_ORIGINS
+from app.config import API_PREFIX, FRONTEND_ORIGINS, LOCALHOST_ORIGIN_REGEX
 from app.routers import layers, radiance, tiles
 
 app = FastAPI(title="DarkFinder API", version="0.1.0")
@@ -9,6 +9,7 @@ app = FastAPI(title="DarkFinder API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
+    allow_origin_regex=LOCALHOST_ORIGIN_REGEX,
     allow_methods=["GET"],
     allow_headers=["*"],
 )

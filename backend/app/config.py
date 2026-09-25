@@ -15,6 +15,11 @@ FRONTEND_ORIGINS = [
     if o.strip()
 ]
 
+# Any localhost/127.0.0.1 port is allowed in dev: Vite silently picks the next free
+# port when 5173 is taken, which would otherwise break CORS. Matched in addition to
+# FRONTEND_ORIGINS, so the exact production origin is unaffected.
+LOCALHOST_ORIGIN_REGEX = r"http://(localhost|127\.0\.0\.1):\d+"
+
 
 def latest_emission_cog() -> str | None:
     """Emission COG to serve: an env-provided URL if set (e.g. R2), else the
