@@ -5,8 +5,13 @@ import type { LayerId } from '../lib/layers'
 import { API_BASE } from '../lib/api'
 import styles from './Map.module.css'
 
-const CARTO_DARK_BASE_TILES = ['https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png']
-const CARTO_DARK_LABEL_TILES = ['https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png']
+// Carto Dark Matter, vector. Requires an API key since Carto's 2026-09-23 terms;
+// without one every tile comes back stamped "API KEY REQUIRED". The key is appended
+// by transformRequest below rather than baked into this URL, because it is also
+// required on the glyph, sprite and vector-tile requests the style fans out to.
+const CARTO_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+const CARTO_KEY = import.meta.env.VITE_CARTO_KEY
+const CARTO_HOST = 'basemaps.cartocdn.com'
 
 // Fallback: NASA GIBS pre-rendered Black Marble tiles (no backend required)
 const GIBS_TILES = [
@@ -44,40 +49,14 @@ export default function Map({ layer, hasData }: MapProps) {
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: {
-        version: 8,
-        sources: {
-          'carto-dark-base': {
-            type: 'raster',
-            tiles: CARTO_DARK_BASE_TILES,
-            tileSize: 256,
-            attribution:
-              '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          },
-          viirs: {
-            type: 'raster',
-            tiles: hasData ? [tileUrl(layer)] : GIBS_TILES,
-            tileSize: 256,
-            maxzoom: hasData ? 13 : 8,
-            attribution: 'NASA Black Marble VIIRS &copy; NASA / EOG',
-          },
-          'carto-dark-labels': {
-            type: 'raster',
-            tiles: CARTO_DARK_LABEL_TILES,
-            tileSize: 256,
-          },
-        },
-        layers: [
-          { id: 'carto-dark-base', type: 'raster', source: 'carto-dark-base' },
-          {
-            id: 'viirs-overlay',
-            type: 'raster',
-            source: 'viirs',
-            paint: { 'raster-opacity': layer === 'skyglow' ? 0.78 : 0.85 },
-          },
-          { id: 'carto-dark-labels', type: 'raster', source: 'carto-dark-labels' },
-        ],
-      },
+      style: CARTO_STYLE,
+      // The style pulls tiles, glyphs and sprites from tiles*.basemaps.cartocdn.com
+      // subdomains, and every one of them needs the key — so match on the host suffix
+      // rather than adding it to each URL by hand.
+      transformRequest: (url) =>
+        CARTO_KEY && url.includes(CARTO_HOST)
+          ? { url: `${url}${url.includes('?') ? '&' : '?'}key=${CARTO_KEY}` }
+          : { url },
       center: [-95, 38],
       zoom: 3,
       minZoom: 2,
@@ -125,6 +104,26 @@ export default function Map({ layer, hasData }: MapProps) {
     applyLayerRef.current = applyLayer
 
     map.on('load', () => {
+      // The basemap style is fetched remotely, so the overlay can only be added once
+      // it has arrived. Insert it beneath the first symbol layer so place names keep
+      // rendering above the VIIRS raster.
+      map.addSource('viirs', {
+        type: 'raster',
+        tiles: hasDataRef.current ? [tileUrl(layerRef.current)] : GIBS_TILES,
+        tileSize: 256,
+        maxzoom: hasDataRef.current ? 13 : 8,
+        attribution: 'NASA Black Marble VIIRS &copy; NASA / EOG',
+      })
+      const firstSymbolId = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id
+      map.addLayer(
+        {
+          id: 'viirs-overlay',
+          type: 'raster',
+          source: 'viirs',
+          paint: { 'raster-opacity': layerRef.current === 'skyglow' ? 0.78 : 0.85 },
+        },
+        firstSymbolId,
+      )
       // Latch ready and apply the latest selection in case it changed mid-load.
       styleReadyRef.current = true
       applyLayer()
@@ -141,7 +140,7 @@ export default function Map({ layer, hasData }: MapProps) {
       applyLayerRef.current = null
       styleReadyRef.current = false
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // init once; layer/hasData reach the callbacks via refs, never via deps
 
   // Apply layer/hasData changes. Update the refs first so both the immediate call and the
   // deferred 'load' handler see the newest selection. Once the style has loaded, setTiles

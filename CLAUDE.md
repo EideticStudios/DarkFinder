@@ -153,6 +153,7 @@ make dev-backend
 - Never commit anything in `backend/data/` — it's gitignored and can be multiple GB. 
 - The VIIRS GeoTIFFs are large (hundreds of MB to several GB). Pipeline scripts should be resumable.
 - MapLibre GL JS uses `maplibre-gl` on npm, not `mapbox-gl`. They are API-compatible but the package name matters.
-- The Carto Dark Matter basemap uses split tiles so labels render above the VIIRS overlay: `dark_nolabels` (bottom), VIIRS overlay (middle), `dark_only_labels` (top). URLs: `https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png` and `https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png` (no API key needed, subject to fair use terms).
+- The basemap is the Carto Dark Matter **vector** style: `https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json`. The VIIRS overlay is added in the map's `load` handler and inserted before the style's first symbol layer, so place labels render above it. Do not reintroduce the old `dark_nolabels`/`dark_only_labels` raster sandwich — `dark_only_labels` is not in CARTO's documented style list.
+- Carto basemaps require an API key as of their 2026-09-23 terms; keyless tiles return HTTP 200 stamped "API KEY REQUIRED". The key lives in `VITE_CARTO_KEY` (`frontend/.env.local`, gitignored; also set in Vercel) and is appended by a MapLibre `transformRequest` hook that matches any `basemaps.cartocdn.com` host — the style, vector tiles, glyphs and sprites each need it. Free non-commercial tier is 5M requests/month.
 - Python virtual environment should be in `backend/.venv/` (gitignored).
 - Use `uv` for Python package management if available, otherwise `pip`.

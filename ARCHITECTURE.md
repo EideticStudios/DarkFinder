@@ -39,11 +39,15 @@ The frontend is a single-page app with one primary view: a full-viewport map.
 - Used directly via its imperative API (`map.addSource` / `map.addLayer`) inside a
   custom React `Map` component — there is no `react-map-gl` wrapper dependency
 
-**Base map: Carto Dark Matter**
-- Free, no API key (fair use policy)
-- Raster tile URL: `https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`
+**Base map: Carto Dark Matter (vector)**
+- Requires a free API key as of CARTO's 2026-09-23 basemap terms; 5M tile
+  requests/month on the non-commercial tier
+- Style URL: `https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json`
+- The key is supplied via `VITE_CARTO_KEY` and appended by a MapLibre
+  `transformRequest` hook, since the style, vector tiles, glyphs and sprites are
+  each fetched from a `*.basemaps.cartocdn.com` host and all need it
 - Dark background is ideal for light pollution overlays
-- Alternative: MapTiler Dark (requires free API key, better vector quality)
+- Alternative: OpenFreeMap dark (keyless) or MapTiler Dark (free key, vector)
 
 **Overlay rendering:**
 The light pollution layer is a standard raster tile layer added on top of the basemap with partial opacity (50-70%). MapLibre's `addSource` + `addLayer` API handles this natively:
@@ -166,7 +170,7 @@ FastAPI is the modern Python web framework with built-in OpenAPI docs, async sup
 GEE hosts the same EOG VNL V2.2 data in a public catalog with no credential wall. Authentication is a one-time `earthengine authenticate` command. The `geemap` library handles tiled downloads for large regions automatically.
 
 **Why Carto Dark Matter?**
-It's free with no API key, has a dark aesthetic that naturally complements a light pollution overlay, and the attribution requirements are minimal (link to Carto + OSM). Not having a paywall or key management simplifies setup and deployment.
+Its dark aesthetic naturally complements a light pollution overlay and the attribution requirements are minimal (link to Carto + OSM). It was originally chosen partly because it needed no API key; CARTO's 2026-09-23 terms ended that, and the free non-commercial tier (5M requests/month, email signup only) was cheap enough to keep the aesthetic rather than switch providers. The vector style also removes the old `dark_nolabels` + `dark_only_labels` raster sandwich: the overlay is now inserted beneath the style's first symbol layer, which keeps labels on top natively.
 
 ## 6. Deployment Considerations
 

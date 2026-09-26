@@ -74,10 +74,10 @@ Falchi/Garstang distance-falloff kernel ([SciPy](https://scipy.org/)), processed
 latitude bands to keep the kernel physically correct as longitudinal scale shrinks toward
 the poles, then written out as its own COG served through the same path.
 
-In the browser, [MapLibre GL JS](https://maplibre.org/) composites three layers:
-[Carto Dark Matter](https://carto.com/basemaps) base tiles underneath, the VIIRS raster in
-the middle, and Carto's label-only tiles on top so place names stay legible above the
-glow. The whole project is open source.
+In the browser, [MapLibre GL JS](https://maplibre.org/) draws the
+[Carto Dark Matter](https://carto.com/basemaps) vector basemap and inserts the VIIRS
+raster directly beneath the basemap's first label layer, so place names stay legible
+above the glow. The whole project is open source.
 
 ## Attribution
 
@@ -86,6 +86,21 @@ Base map tiles © [CARTO](https://carto.com/attributions), with map data ©
 data courtesy of NASA and the [Earth Observation Group](https://eogdata.mines.edu/) at the
 Colorado School of Mines. DarkFinder is an independent project and is not affiliated with
 or endorsed by these providers.
+
+## Configuration
+
+The basemap needs a free CARTO Basemaps API key — without one, tiles come back stamped
+"API KEY REQUIRED". Request one at
+[carto.com/basemaps/apikey](https://carto.com/basemaps/apikey/) (email only, no account;
+5M tile requests/month on the non-commercial tier), then:
+
+```bash
+cp frontend/.env.example frontend/.env.local
+# set VITE_CARTO_KEY=... in frontend/.env.local
+```
+
+`.env.local` is gitignored. For deploys, set `VITE_CARTO_KEY` as a build-time
+environment variable on the hosting platform.
 
 ## Getting started
 
