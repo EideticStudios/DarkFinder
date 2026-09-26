@@ -28,15 +28,34 @@ export default function App() {
 
   useEffect(() => {
     fetch(`${API_BASE}/layers`)
-      .then((r) => r.json())
+      .then((r) => {
+        // Without this, an error response with a JSON body (e.g. a 500 from the tile
+        // service) parses happily, leaves `emission` undefined, and degrades exactly
+        // like an unreachable backend — with nothing logged either way.
+        if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`)
+        return r.json()
+      })
       .then((data: { emission: boolean; skyglow: boolean }) => {
         if (data.emission) {
           setHasData(true)
           setSkyglowAvailable(data.skyglow)
+          return
         }
+        console.warn(
+          `DarkFinder: ${API_BASE}/layers reports no emission COG available. ` +
+            'Falling back to NASA GIBS imagery; Sky Glow will be unavailable. ' +
+            'Run `make pipeline` to build the COGs.',
+        )
       })
-      .catch(() => {
-        // Backend not running — will fall back to GIBS tiles
+      // Falling back to GIBS is deliberate, but it is indistinguishable from a working
+      // map on screen, so say why on the console rather than failing silently.
+      .catch((err: unknown) => {
+        console.warn(
+          `DarkFinder: could not load ${API_BASE}/layers — falling back to NASA GIBS ` +
+            'imagery; Sky Glow will be unavailable. Check the backend is running and ' +
+            'that this origin is allowed by CORS.',
+          err,
+        )
       })
       .finally(() => setReady(true))
   }, [])
